@@ -3,31 +3,20 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   ShoppingBag, 
-  Database, 
   Check, 
-  AlertCircle, 
-  Loader2, 
   UserCheck, 
-  Settings,
-  X,
-  AlertTriangle,
-  Moon,
-  Sun,
-  Palette
+  Moon, 
+  Sun, 
+  Palette 
 } from 'lucide-vue-next'
 import { 
   cartCount, 
-  isDbConnected, 
-  getTursoConfig, 
-  saveTursoConfig, 
-  clearTursoConfig,
   themeMode,
   themeColor,
   setThemeMode,
   setThemeColor
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { 
   Dialog, 
   DialogContent, 
@@ -38,63 +27,8 @@ import {
 
 const router = useRouter()
 
-// Configuração do Turso no Modal
+// Configuração do Tema no Modal
 const showSettings = ref(false)
-const dbUrl = ref('')
-const dbToken = ref('')
-const isConnecting = ref(false)
-const connectError = ref('')
-const connectSuccess = ref(false)
-
-// Carrega as credenciais existentes se houver
-const currentConfig = getTursoConfig()
-if (currentConfig) {
-  dbUrl.value = currentConfig.url
-  dbToken.value = currentConfig.token
-}
-
-// Lógica de Conexão com o Turso
-const handleConnect = async () => {
-  if (!dbUrl.value || !dbToken.value) {
-    connectError.value = 'Por favor, preencha todos os campos.'
-    return
-  }
-  
-  isConnecting.value = true
-  connectError.value = ''
-  connectSuccess.value = false
-  
-  try {
-    const success = await saveTursoConfig({
-      url: dbUrl.value.trim(),
-      token: dbToken.value.trim()
-    })
-    
-    if (success) {
-      connectSuccess.value = true
-      setTimeout(() => {
-        showSettings.value = false
-        connectSuccess.value = false
-        // Recarrega a página atual para recarregar os dados do Turso
-        window.location.reload()
-      }, 1500)
-    }
-  } catch (err: any) {
-    connectError.value = err.message || 'Falha ao conectar. Verifique as credenciais.'
-  } finally {
-    isConnecting.value = false
-  }
-}
-
-// Lógica de Desconexão
-const handleDisconnect = () => {
-  clearTursoConfig()
-  dbUrl.value = ''
-  dbToken.value = ''
-  showSettings.value = false
-  // Recarrega para usar fallback local
-  window.location.reload()
-}
 
 // Animação de "bounce" temporária ao alterar contagem do carrinho
 const animateCart = ref(false)
@@ -137,7 +71,7 @@ const handleAdminLogout = () => {
         <!-- Logo e Links -->
         <div class="flex items-center gap-8">
           <router-link to="/" class="flex items-center gap-2 group">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-start to-brand-end flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-all duration-300">
+            <div class="w-9 h-9 rounded-xl bg-linear-to-tr from-brand-start to-brand-end flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-all duration-300">
               <span class="text-white font-black text-lg">T</span>
             </div>
             <span class="font-extrabold text-xl tracking-tight transition-colors duration-200"
@@ -172,49 +106,37 @@ const handleAdminLogout = () => {
 
         <!-- Ações do Cabeçalho -->
         <div class="flex items-center gap-3">
-          <!-- Botão Configurações (Tema e Banco) -->
+          <!-- Botão Aparência (Apenas Tema e Cores) -->
           <Dialog v-model:open="showSettings">
             <DialogTrigger as-child>
               <Button 
                 variant="outline" 
                 size="sm"
                 class="rounded-xl gap-2 transition-all duration-300 font-bold"
-                :class="[
-                  themeMode === 'dark' ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-slate-700 text-slate-350' : 'bg-white hover:bg-slate-50 border-slate-250 hover:border-slate-300 text-slate-700',
-                  isDbConnected ? 'border-emerald-500/30 text-emerald-450 hover:text-emerald-400' : ''
-                ]"
+                :class="themeMode === 'dark' ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-slate-700 text-slate-300' : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700'"
               >
-                <Settings class="w-4 h-4 text-primary" />
-                <span class="hidden sm:inline">Configurações</span>
-                <span class="w-2 h-2 rounded-full" :class="isDbConnected ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50 animate-pulse' : 'bg-amber-500'"></span>
+                <Palette class="w-4 h-4 text-primary" />
+                <span class="hidden sm:inline">Aparência</span>
               </Button>
             </DialogTrigger>
-            <DialogContent class="sm:max-w-[480px] rounded-2xl shadow-2xl transition-colors duration-300"
+            <DialogContent class="sm:max-w-[440px] rounded-2xl shadow-2xl transition-colors duration-300"
               :class="themeMode === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'"
             >
               <DialogHeader>
                 <DialogTitle class="text-xl font-extrabold flex items-center gap-2"
                   :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
                 >
-                  <Settings class="w-5 h-5 text-primary" />
-                  Configurações da Loja
+                  <Palette class="w-5 h-5 text-primary" />
+                  Aparência da Loja
                 </DialogTitle>
                 <p class="text-slate-400 text-xs mt-1">
-                  Ajuste a aparência visual do e-commerce e as credenciais de sincronização na nuvem.
+                  Personalize o tema e as cores de destaque da sua loja virtual.
                 </p>
               </DialogHeader>
 
               <div class="space-y-5 my-4">
-                
-                <!-- 1. PERSONALIZAÇÃO VISUAL (TEMA E CORES) -->
-                <div class="space-y-3 pb-5 border-b"
-                  :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'"
-                >
-                  <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <Palette class="w-3.5 h-3.5 text-primary" />
-                    Personalização Visual
-                  </h4>
-                  
+                <!-- PERSONALIZAÇÃO VISUAL (TEMA E CORES) -->
+                <div class="space-y-4">
                   <!-- Modo Dark/Light -->
                   <div class="flex items-center justify-between text-xs sm:text-sm">
                     <span class="text-slate-400 font-semibold">Tema do Projeto</span>
@@ -249,7 +171,9 @@ const handleAdminLogout = () => {
                   </div>
 
                   <!-- Cor de Destaque -->
-                  <div class="flex items-center justify-between text-xs sm:text-sm pt-1">
+                  <div class="flex items-center justify-between text-xs sm:text-sm pt-2 border-t"
+                    :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'"
+                  >
                     <span class="text-slate-400 font-semibold">Cor de Destaque</span>
                     <div class="flex items-center gap-2">
                       <!-- Purple -->
@@ -300,98 +224,6 @@ const handleAdminLogout = () => {
                     </div>
                   </div>
                 </div>
-
-                <!-- 2. CONEXÃO COM TURSO -->
-                <div class="space-y-4 pt-1">
-                  <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <Database class="w-3.5 h-3.5 text-primary" />
-                    Persistência de Dados (Turso DB)
-                  </h4>
-                  
-                  <!-- Status Atual -->
-                  <div class="p-3.5 rounded-xl border flex items-start gap-3" 
-                    :class="isDbConnected 
-                      ? (themeMode === 'dark' ? 'bg-emerald-950/20 border-emerald-500/20' : 'bg-emerald-50/60 border-emerald-200 text-slate-800') 
-                      : (themeMode === 'dark' ? 'bg-amber-950/20 border-amber-500/20' : 'bg-amber-50/60 border-amber-200 text-slate-800')"
-                  >
-                    <AlertCircle class="w-5 h-5 mt-0.5 shrink-0" :class="isDbConnected ? 'text-emerald-500' : 'text-amber-500'" />
-                    <div>
-                      <h4 class="font-bold text-sm" :class="isDbConnected ? 'text-emerald-500' : 'text-amber-500'">
-                        {{ isDbConnected ? 'Conectado à Nuvem (Online)' : 'Modo Offline (Local Storage)' }}
-                      </h4>
-                      <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed"
-                        :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                      >
-                        {{ isDbConnected 
-                          ? 'Seu e-commerce está rodando online conectado ao Turso DB. Os dados e imagens cadastrados no Admin são persistidos na nuvem.' 
-                          : 'Você está no modo offline. Os dados ficam salvos apenas neste navegador. Conecte ao Turso para ter persistência real!' 
-                        }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <!-- Formulário -->
-                  <div class="space-y-3">
-                    <div class="space-y-1">
-                      <label class="text-xs font-bold text-slate-400"
-                        :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                      >Database URL (libsql://...)</label>
-                      <Input 
-                        v-model="dbUrl" 
-                        placeholder="libsql://seu-banco-usuario.turso.io" 
-                        class="rounded-xl"
-                        :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
-                      />
-                    </div>
-                    <div class="space-y-1">
-                      <label class="text-xs font-bold text-slate-400"
-                        :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                      >Auth Token</label>
-                      <Input 
-                        v-model="dbToken" 
-                        type="password"
-                        placeholder="eyJhbGciOiJ..." 
-                        class="rounded-xl"
-                        :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Feedbacks -->
-                <div v-if="connectError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
-                  <AlertTriangle class="w-4 h-4 shrink-0" />
-                  <span>{{ connectError }}</span>
-                </div>
-
-                <div v-if="connectSuccess" class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
-                  <Check class="w-4 h-4 shrink-0" />
-                  <span>Conectado com sucesso! Sincronizando tabelas...</span>
-                </div>
-              </div>
-
-              <!-- Ações -->
-              <div class="flex items-center justify-end gap-2 border-t pt-4 mt-2"
-                :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-150'"
-              >
-                <Button 
-                  v-if="isDbConnected"
-                  variant="destructive" 
-                  size="sm"
-                  class="rounded-xl font-bold bg-red-950 hover:bg-red-900 border border-red-800/50 text-red-200"
-                  @click="handleDisconnect"
-                >
-                  Desconectar
-                </Button>
-                <Button 
-                  size="sm"
-                  class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-                  :disabled="isConnecting"
-                  @click="handleConnect"
-                >
-                  <Loader2 v-if="isConnecting" class="w-4 h-4 animate-spin mr-1.5" />
-                  {{ isConnecting ? 'Conectando...' : 'Salvar & Conectar' }}
-                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -473,9 +305,6 @@ const handleAdminLogout = () => {
           :class="themeMode === 'dark' ? 'bg-gradient-to-r from-slate-200 to-slate-400 bg-clip-text text-transparent' : 'text-slate-700'"
         >
           ThorderStore &copy; 2026 - Conectividade Híbrida Turso DB
-        </p>
-        <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-          Feito em Vue 3, shadcn-vue e Tailwind CSS v4. Conexões de banco SQLite distribuídas na nuvem de baixa latência.
         </p>
       </div>
     </footer>

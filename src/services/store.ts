@@ -158,7 +158,10 @@ export function getCart(): CartItem[] {
 
 // Estado reativo compartilhado
 export const cartCount = ref(getCart().reduce((sum, item) => sum + item.quantity, 0));
-export const isDbConnected = ref(localStorage.getItem(TURSO_CONFIG_KEY) !== null);
+export const isDbConnected = ref(
+  (import.meta.env.VITE_TURSO_DB_URL !== undefined && import.meta.env.VITE_TURSO_DB_URL !== '') ||
+  localStorage.getItem(TURSO_CONFIG_KEY) !== null
+);
 
 export function saveCart(cart: CartItem[]): void {
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -284,13 +287,35 @@ async function migrateLocalDataToTurso(client: any) {
 }
 
 // Obtém o cliente libSQL configurado ou retorna null (para usar LocalStorage)
-function getDbClient() {
+export function getDbClient() {
+  // 1. Tenta obter das variáveis de ambiente do Vite (ótimo para deploys em produção Vercel/Netlify)
+  const envUrl = import.meta.env.VITE_TURSO_DB_URL;
+  const envToken = import.meta.env.VITE_TURSO_DB_TOKEN;
+  
+  if (envUrl && envToken) {
+    return createClient({
+      url: envUrl,
+      authToken: envToken
+    });
+  }
+
+  // 2. Fallback para configuração manual no localStorage
   const config = getTursoConfig();
   if (!config) return null;
   return createClient({
     url: config.url,
     authToken: config.token
   });
+}
+
+// Inicializa tabelas automaticamente se configurado via variáveis de ambiente
+if (typeof document !== 'undefined') {
+  const client = getDbClient();
+  if (client && import.meta.env.VITE_TURSO_DB_URL) {
+    initializeTables(client)
+      .then(() => migrateLocalDataToTurso(client))
+      .catch(err => console.error("Falha ao inicializar tabelas automáticas do Turso:", err));
+  }
 }
 
 /* ==========================================

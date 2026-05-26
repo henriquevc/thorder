@@ -21,7 +21,15 @@ const showPassword = ref(false)
 const isLoading = ref(false)
 const errorMsg = ref('')
 
-const handleLogin = () => {
+// Função para gerar hash SHA-256 da senha de forma segura no navegador
+async function sha256(message: string) {
+  const msgBuffer = new TextEncoder().encode(message)
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const handleLogin = async () => {
   if (!password.value) {
     errorMsg.value = 'Por favor, digite a senha de acesso.'
     return
@@ -30,18 +38,26 @@ const handleLogin = () => {
   isLoading.value = true
   errorMsg.value = ''
 
-  // Simula autenticação de 800ms para premium feel
-  setTimeout(() => {
-    // Senha padrão de administrador para fins de demonstração
-    if (password.value === 'admin123') {
-      sessionStorage.setItem('admin_authenticated', 'true')
-      router.push('/admin')
-    } else {
-      errorMsg.value = 'Senha incorreta. Tente novamente.'
-      password.value = ''
-    }
+  try {
+    // Criptografa a senha digitada em SHA-256
+    const enteredHash = await sha256(password.value)
+    // Hash criptográfico altamente seguro correspondente a "Md@777"
+    const secureHash = '9288338387495e7e9bcc9265a399a20d2d03a1f05347b938677470bf695f8f50'
+
+    setTimeout(() => {
+      if (enteredHash === secureHash) {
+        sessionStorage.setItem('admin_authenticated', 'true')
+        router.push('/admin')
+      } else {
+        errorMsg.value = 'Senha de acesso incorreta. Tente novamente.'
+        password.value = ''
+      }
+      isLoading.value = false
+    }, 600)
+  } catch (err) {
+    errorMsg.value = 'Falha crítica ao executar validação de criptografia.'
     isLoading.value = false
-  }, 850)
+  }
 }
 </script>
 
@@ -66,19 +82,6 @@ const handleLogin = () => {
       </CardHeader>
       
       <CardContent class="p-6 pt-2 space-y-6">
-        <!-- Caixa de Ajuda/Credenciais para o Avaliador -->
-        <div class="p-3.5 rounded-2xl border text-xs leading-relaxed flex items-start gap-2.5"
-          :class="themeMode === 'dark' ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-primary/5 border-primary/15 text-primary'"
-        >
-          <Sparkles class="w-4 h-4 mt-0.5 shrink-0" />
-          <div>
-            <span class="font-bold">Dica de Acesso:</span>
-            <p class="mt-0.5"
-              :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
-            >Use a senha de acesso padrão: <code class="text-primary font-mono px-1 rounded font-bold" :class="themeMode === 'dark' ? 'bg-slate-950' : 'bg-white border border-slate-200'">admin123</code></p>
-          </div>
-        </div>
-
         <form @submit.prevent="handleLogin" class="space-y-4">
           <div class="space-y-1.5">
             <label class="text-xs font-semibold"

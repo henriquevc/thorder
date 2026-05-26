@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   ShoppingBag, 
@@ -32,6 +32,19 @@ const isCalculatingShipping = ref(false)
 const shippingOptions = ref<ShippingOption[]>([])
 const selectedShipping = ref<ShippingOption | null>(null)
 const shippingError = ref('')
+
+const formatCEP = (value: string) => {
+  const clean = value.replace(/\D/g, '')
+  const limited = clean.slice(0, 8)
+  if (limited.length > 5) {
+    return `${limited.slice(0, 5)}-${limited.slice(5)}`
+  }
+  return limited
+}
+
+watch(cepInput, (newVal) => {
+  cepInput.value = formatCEP(newVal)
+})
 
 onMounted(() => {
   cartItems.value = getCart()
@@ -127,9 +140,9 @@ const handleCalculateShipping = () => {
   shippingError.value = ''
   
   // Simula atraso na rede de 800ms para premium feel
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
-      const options = calculateShipping(cleanCep)
+      const options = await calculateShipping(cleanCep)
       shippingOptions.value = options
       // Seleciona a primeira opção por padrão (mais econômica)
       selectedShipping.value = options[0]
@@ -172,29 +185,29 @@ const handleGoToCheckout = () => {
     <!-- Cabeçalho da Página -->
     <div class="flex items-center justify-between">
       <div class="space-y-1">
-        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-100 flex items-center gap-2">
-          <ShoppingBag class="w-6 h-6 text-purple-500" />
+        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-850 flex items-center gap-2">
+          <ShoppingBag class="w-6 h-6 text-primary" />
           Seu Carrinho de Compras
         </h1>
-        <p class="text-slate-400 text-xs md:text-sm">
+        <p class="text-slate-500 text-xs md:text-sm">
           Gerencie os itens do seu pedido e calcule a taxa de entrega.
         </p>
       </div>
-      <router-link to="/" class="text-xs md:text-sm font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 group">
+      <router-link to="/" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar à loja
       </router-link>
     </div>
 
     <!-- Carrinho Vazio -->
-    <div v-if="cartItems.length === 0" class="text-center py-20 bg-slate-900/10 border border-dashed border-slate-800 rounded-3xl space-y-4">
-      <ShoppingBag class="w-16 h-16 text-slate-700 mx-auto" />
-      <h3 class="text-lg font-bold text-slate-200">Seu carrinho está vazio</h3>
-      <p class="text-slate-500 text-xs md:text-sm max-w-xs mx-auto leading-relaxed">
+    <div v-if="cartItems.length === 0" class="text-center py-20 bg-slate-100/50 border border-dashed border-slate-200 rounded-3xl space-y-4">
+      <ShoppingBag class="w-16 h-16 text-slate-300 mx-auto" />
+      <h3 class="text-lg font-bold text-slate-800">Seu carrinho está vazio</h3>
+      <p class="text-slate-550 text-xs md:text-sm max-w-xs mx-auto leading-relaxed">
         Parece que você ainda não adicionou produtos. Explore nosso catálogo premium e faça suas escolhas.
       </p>
       <Button 
-        class="rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 shadow-lg shadow-purple-500/20"
+        class="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 shadow-lg shadow-primary/20"
         @click="router.push('/')"
       >
         Ver Catálogo
@@ -206,29 +219,29 @@ const handleGoToCheckout = () => {
       <!-- Lista de Itens (2 Colunas no desktop) -->
       <div class="lg:col-span-2 space-y-4">
         <!-- Tabela Responsiva de Itens -->
-        <div class="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden shadow-xl">
+        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
           <!-- Cabeçalho Oculto em Mobile -->
-          <div class="hidden sm:grid grid-cols-12 gap-4 px-6 py-3.5 bg-slate-950/60 border-b border-slate-900 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div class="hidden sm:grid grid-cols-12 gap-4 px-6 py-3.5 bg-slate-50 border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
             <span class="col-span-6">Produto</span>
             <span class="col-span-2 text-center">Preço</span>
             <span class="col-span-2 text-center">Qtd.</span>
             <span class="col-span-2 text-right">Total</span>
           </div>
 
-          <div class="divide-y divide-slate-900">
+          <div class="divide-y divide-slate-100">
             <div 
               v-for="item in cartItems" 
               :key="item.product.id"
-              class="grid grid-cols-1 sm:grid-cols-12 gap-4 p-5 sm:p-6 items-center hover:bg-slate-900/10 transition-colors duration-200"
+              class="grid grid-cols-1 sm:grid-cols-12 gap-4 p-5 sm:p-6 items-center hover:bg-slate-50/40 transition-colors duration-200"
             >
               <!-- Info Produto + Foto -->
               <div class="col-span-1 sm:col-span-6 flex items-center gap-4">
-                <div class="w-16 h-16 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 shrink-0">
+                <div class="w-16 h-16 rounded-xl bg-slate-50 overflow-hidden border border-slate-100 shrink-0">
                   <img :src="item.product.image_data" :alt="item.product.name" class="w-full h-full object-cover" />
                 </div>
                 <div class="space-y-1">
-                  <h4 class="font-bold text-slate-200 text-sm md:text-base leading-tight">{{ item.product.name }}</h4>
-                  <span class="inline-block px-2 py-0.5 rounded bg-slate-950 text-[10px] text-purple-400 font-semibold border border-slate-800 uppercase tracking-wide">
+                  <h4 class="font-bold text-slate-800 text-sm md:text-base leading-tight">{{ item.product.name }}</h4>
+                  <span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-[10px] text-primary font-semibold border border-slate-200 uppercase tracking-wide">
                     {{ item.product.category }}
                   </span>
                 </div>
@@ -237,26 +250,26 @@ const handleGoToCheckout = () => {
               <!-- Preço unitário -->
               <div class="col-span-1 sm:col-span-2 flex sm:flex-col justify-between sm:justify-center items-center text-sm">
                 <span class="sm:hidden text-slate-500 font-medium">Preço</span>
-                <span class="font-semibold text-slate-300">{{ formatPrice(item.product.price) }}</span>
+                <span class="font-semibold text-slate-700">{{ formatPrice(item.product.price) }}</span>
               </div>
 
               <!-- Quantidade -->
               <div class="col-span-1 sm:col-span-2 flex sm:justify-center justify-between items-center">
                 <span class="sm:hidden text-slate-500 font-medium">Quantidade</span>
-                <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800/80 rounded-xl p-1 shrink-0">
+                <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1 shrink-0">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    class="h-6 w-6 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
+                    class="h-6 w-6 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800"
                     @click="updateQuantity(item, -1)"
                   >
                     <Minus class="w-3.5 h-3.5" />
                   </Button>
-                  <span class="w-6 text-center text-xs font-bold text-slate-200">{{ item.quantity }}</span>
+                  <span class="w-6 text-center text-xs font-bold text-slate-800">{{ item.quantity }}</span>
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    class="h-6 w-6 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
+                    class="h-6 w-6 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800"
                     @click="updateQuantity(item, 1)"
                   >
                     <Plus class="w-3.5 h-3.5" />
@@ -268,13 +281,13 @@ const handleGoToCheckout = () => {
               <div class="col-span-1 sm:col-span-2 flex justify-between sm:justify-end items-center gap-4">
                 <span class="sm:hidden text-slate-500 font-medium">Total</span>
                 <div class="flex items-center gap-3">
-                  <span class="font-extrabold text-sm md:text-base text-slate-200">
+                  <span class="font-extrabold text-sm md:text-base text-slate-800">
                     {{ formatPrice(item.product.price * item.quantity) }}
                   </span>
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    class="h-8 w-8 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/20"
+                    class="h-8 w-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50"
                     @click="handleRemoveItem(item.product.id!)"
                   >
                     <Trash2 class="w-4 h-4" />
@@ -286,10 +299,10 @@ const handleGoToCheckout = () => {
         </div>
 
         <!-- Seção do Simulador de Frete -->
-        <Card class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl">
-          <CardHeader class="pb-3 border-b border-slate-900/60">
-            <CardTitle class="text-base font-bold flex items-center gap-2 text-slate-200">
-              <Truck class="w-4 h-4 text-purple-500" />
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold flex items-center gap-2 text-slate-800">
+              <Truck class="w-4 h-4 text-primary" />
               Simular Valor de Entrega (CEP)
             </CardTitle>
           </CardHeader>
@@ -298,12 +311,13 @@ const handleGoToCheckout = () => {
               <Input 
                 id="cep-input"
                 v-model="cepInput"
-                placeholder="Ex: 01310-100"
-                class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-600 focus-visible:ring-purple-500"
+                maxLength="9"
+                placeholder="Ex: 14240-000"
+                class="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl focus-visible:ring-primary"
                 @keyup.enter="handleCalculateShipping"
               />
               <Button 
-                class="rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 font-bold shrink-0"
+                class="rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-350 text-slate-700 hover:text-slate-900 font-bold shrink-0"
                 :disabled="isCalculatingShipping"
                 @click="handleCalculateShipping"
               >
@@ -313,8 +327,8 @@ const handleGoToCheckout = () => {
             </div>
 
             <!-- Feedbacks e Erros -->
-            <div v-if="shippingError" class="text-xs text-red-400 flex items-center gap-1.5">
-              <AlertTriangle class="w-4 h-4" />
+            <div v-if="shippingError" class="text-xs text-red-500 flex items-center gap-1.5">
+              <AlertTriangle class="w-4 h-4 animate-bounce" />
               <span>{{ shippingError }}</span>
             </div>
 
@@ -325,22 +339,22 @@ const handleGoToCheckout = () => {
                 :key="option.carrier"
                 class="flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all duration-200"
                 :class="selectedShipping?.carrier === option.carrier 
-                  ? 'bg-purple-950/20 border-purple-500/80 shadow-md shadow-purple-500/5' 
-                  : 'bg-slate-950/40 border-slate-900 hover:border-slate-800'"
+                  ? 'bg-primary/5 border-primary shadow-sm' 
+                  : 'bg-slate-50/40 border-slate-200 hover:border-slate-300'"
                 @click="handleSelectShipping(option)"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-4 h-4 rounded-full border flex items-center justify-center shrink-0"
-                    :class="selectedShipping?.carrier === option.carrier ? 'border-purple-500 bg-purple-500 text-white' : 'border-slate-700'"
+                    :class="selectedShipping?.carrier === option.carrier ? 'border-primary bg-primary text-primary-foreground' : 'border-slate-300 bg-white'"
                   >
                     <span v-if="selectedShipping?.carrier === option.carrier" class="w-1.5 h-1.5 rounded-full bg-white"></span>
                   </div>
                   <div>
-                    <h5 class="text-xs md:text-sm font-bold text-slate-200">{{ option.carrier }}</h5>
+                    <h5 class="text-xs md:text-sm font-bold text-slate-800">{{ option.carrier }}</h5>
                     <p class="text-[10px] md:text-xs text-slate-500 mt-0.5">Prazo estimado: {{ option.deliveryDays }} {{ option.deliveryDays === 1 ? 'dia útil' : 'dias úteis' }}</p>
                   </div>
                 </div>
-                <span class="font-extrabold text-xs md:text-sm text-purple-400">
+                <span class="font-extrabold text-xs md:text-sm text-primary">
                   {{ formatPrice(option.price) }}
                 </span>
               </div>
@@ -351,31 +365,31 @@ const handleGoToCheckout = () => {
 
       <!-- Resumo de Custos (1 Coluna) -->
       <div class="space-y-4">
-        <Card class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl sticky top-24">
-          <CardHeader class="pb-3 border-b border-slate-900/60">
-            <CardTitle class="text-base font-bold text-slate-200">Resumo da Compra</CardTitle>
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm sticky top-24">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold text-slate-800">Resumo da Compra</CardTitle>
           </CardHeader>
           <CardContent class="p-6 space-y-6">
             <!-- Detalhe de Custos -->
             <div class="space-y-3 text-xs md:text-sm">
-              <div class="flex justify-between text-slate-400">
+              <div class="flex justify-between text-slate-500">
                 <span>Subtotal (Itens)</span>
-                <span class="font-semibold text-slate-200">{{ formatPrice(subtotal) }}</span>
+                <span class="font-semibold text-slate-700">{{ formatPrice(subtotal) }}</span>
               </div>
-              <div class="flex justify-between text-slate-400">
+              <div class="flex justify-between text-slate-500">
                 <span>Taxa de Entrega (Frete)</span>
-                <span class="font-semibold" :class="selectedShipping ? 'text-slate-200' : 'text-slate-600 italic'">
+                <span class="font-semibold text-slate-700" :class="selectedShipping ? '' : 'text-slate-400 italic'">
                   {{ selectedShipping ? formatPrice(selectedShipping.price) : 'Não calculado' }}
                 </span>
               </div>
               
               <!-- Divisor -->
-              <div class="border-t border-slate-900/80 my-2"></div>
+              <div class="border-t border-slate-100 my-2"></div>
               
               <!-- Total Geral -->
               <div class="flex justify-between items-baseline">
-                <span class="font-bold text-slate-300">Valor Total</span>
-                <span class="font-black text-xl text-slate-100 bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
+                <span class="font-bold text-slate-800">Valor Total</span>
+                <span class="font-black text-xl text-slate-900">
                   {{ formatPrice(total) }}
                 </span>
               </div>
@@ -383,7 +397,7 @@ const handleGoToCheckout = () => {
 
             <!-- Botão de Ação -->
             <Button 
-              class="w-full rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-5 shadow-lg shadow-purple-500/20 flex items-center justify-center gap-1 group"
+              class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5 shadow-lg shadow-primary/20 flex items-center justify-center gap-1 group"
               @click="handleGoToCheckout"
             >
               <span>Prosseguir para Checkout</span>
@@ -391,7 +405,7 @@ const handleGoToCheckout = () => {
             </Button>
 
             <!-- Políticas Extras -->
-            <div class="text-[10px] text-slate-500 leading-relaxed text-center">
+            <div class="text-[10px] text-slate-450 leading-relaxed text-center">
               Ao continuar você aceita nossos termos de garantia premium. Entregas simuladas integradas em tempo real com Turso Cloud.
             </div>
           </CardContent>

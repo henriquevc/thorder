@@ -11,7 +11,8 @@ import {
   Check,
   AlertTriangle,
   AlertCircle,
-  Palette
+  Palette,
+  MapPin
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -23,6 +24,8 @@ import {
   themeMode,
   themeColor,
   setThemeColor,
+  fetchSetting,
+  saveSetting,
   type Order, 
   type Product 
 } from '@/services/store'
@@ -43,6 +46,13 @@ const dbToken = ref('')
 const isConnecting = ref(false)
 const connectError = ref('')
 const connectSuccess = ref(false)
+
+// Configurações do Endereço e WhatsApp da Tabacaria
+const storeAddress = ref('')
+const storeWhatsapp = ref('')
+const isSavingAddress = ref(false)
+const saveAddressSuccess = ref(false)
+const saveAddressError = ref('')
 
 // Carrega as credenciais existentes se houver
 const currentConfig = getTursoConfig()
@@ -92,15 +102,58 @@ const handleDisconnect = () => {
   window.location.reload()
 }
 
+// Salvar Configurações Locais (Endereço e WhatsApp)
+const handleSaveSettings = async () => {
+  if (!storeAddress.value.trim()) {
+    saveAddressError.value = 'O endereço não pode ser vazio.'
+    return
+  }
+  if (!storeWhatsapp.value.trim()) {
+    saveAddressError.value = 'O WhatsApp não pode ser vazio.'
+    return
+  }
+  
+  isSavingAddress.value = true
+  saveAddressError.value = ''
+  saveAddressSuccess.value = false
+  
+  try {
+    const cleanWhatsapp = storeWhatsapp.value.replace(/\D/g, '')
+    if (cleanWhatsapp.length < 10) {
+      throw new Error('Por favor, insira um número de WhatsApp válido com DDD (ex: 16999999999).')
+    }
+    
+    await Promise.all([
+      saveSetting('store_address', storeAddress.value.trim()),
+      saveSetting('store_whatsapp', cleanWhatsapp)
+    ])
+    
+    storeWhatsapp.value = cleanWhatsapp
+    
+    saveAddressSuccess.value = true
+    setTimeout(() => {
+      saveAddressSuccess.value = false
+    }, 2000)
+  } catch (e: any) {
+    saveAddressError.value = e.message || 'Falha ao salvar as configurações no banco de dados.'
+  } finally {
+    isSavingAddress.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     // Carrega estatísticas iniciais em paralelo
-    const [orders, products] = await Promise.all([
+    const [orders, products, address, whatsapp] = await Promise.all([
       fetchOrders(),
-      fetchProducts()
+      fetchProducts(),
+      fetchSetting('store_address', 'Rua Marechal Deodoro, 150 - Centro, Cajuru - SP'),
+      fetchSetting('store_whatsapp', '5516999999999')
     ])
     ordersList.value = orders
     productsList.value = products
+    storeAddress.value = address
+    storeWhatsapp.value = whatsapp
   } catch (err) {
     console.error('Falha ao obter dados estatísticos:', err)
   } finally {
@@ -358,7 +411,84 @@ const formatPrice = (val: number) => {
           </CardContent>
         </Card>
 
-        <!-- 2. SINCRONIZAÇÃO DE BANCO DE DADOS -->
+        <!-- 2. ENDEREÇO E WHATSAPP DA TABACARIA -->
+        <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
+          :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
+        >
+          <CardHeader class="border-b pb-4" :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'">
+            <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+              :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+            >
+              <MapPin class="w-5 h-5 text-primary" />
+              Configurações de Retirada &amp; WhatsApp
+            </CardTitle>
+            <p class="text-slate-400 text-xs mt-1">
+              Configure o endereço físico e o número de WhatsApp receptor de pedidos da sua loja. O endereço será exibido para os clientes que escolherem a opção de Retirada, e o WhatsApp receberá os detalhes estruturados de cada pedido. Os dados são salvos diretamente no banco de dados Turso.
+            </p>
+          </CardHeader>
+          
+          <CardContent class="p-6 space-y-5">
+            <!-- Endereço Completo -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+              >Endereço Completo da Tabacaria</label>
+              <Input 
+                v-model="storeAddress" 
+                placeholder="Ex: Rua Marechal Deodoro, 150 - Centro, Cajuru - SP" 
+                class="rounded-xl focus:ring-primary w-full"
+                :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
+                @keyup.enter="handleSaveSettings"
+              />
+              <p class="text-[10px] text-slate-500">Inclua rua, número, bairro, cidade e estado para facilitar a localização do cliente.</p>
+            </div>
+
+            <!-- WhatsApp Receptor de Pedidos -->
+            <div class="space-y-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+              >WhatsApp para Receber Pedidos</label>
+              <Input 
+                v-model="storeWhatsapp" 
+                placeholder="Ex: 5516999999999" 
+                class="rounded-xl focus:ring-primary w-full"
+                :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
+                @keyup.enter="handleSaveSettings"
+              />
+              <p class="text-[10px] text-slate-550">
+                Insira o número completo com código do país (55 para Brasil) e DDD, apenas números. Ex: <strong class="text-primary font-bold">5516999999999</strong>.
+              </p>
+            </div>
+
+            <!-- Feedbacks -->
+            <div v-if="saveAddressError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              <span>{{ saveAddressError }}</span>
+            </div>
+
+            <div v-if="saveAddressSuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
+              <Check class="w-4 h-4 shrink-0" />
+              <span>Configurações locais atualizadas com sucesso no banco de dados Turso!</span>
+            </div>
+
+            <!-- Ações -->
+            <div class="flex justify-end pt-2 border-t"
+              :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-150'"
+            >
+              <Button 
+                size="sm"
+                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                :disabled="isSavingAddress"
+                @click="handleSaveSettings"
+              >
+                <Loader2 v-if="isSavingAddress" class="w-4 h-4 animate-spin mr-1.5" />
+                {{ isSavingAddress ? 'Salvando...' : 'Salvar Configurações' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- 3. SINCRONIZAÇÃO DE BANCO DE DADOS -->
         <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
           :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
         >

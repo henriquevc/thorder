@@ -3,18 +3,11 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   ShoppingBag, 
-  Check, 
-  UserCheck, 
-  Moon, 
-  Sun, 
-  Palette 
+  UserCheck
 } from 'lucide-vue-next'
 import { 
   cartCount, 
-  themeMode,
-  themeColor,
-  setThemeMode,
-  setThemeColor
+  themeMode
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
 import { 
@@ -26,9 +19,6 @@ import {
 } from '@/components/ui/dialog'
 
 const router = useRouter()
-
-// Configuração do Tema no Modal
-const showSettings = ref(false)
 
 // Animação de "bounce" temporária ao alterar contagem do carrinho
 const animateCart = ref(false)

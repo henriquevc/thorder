@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   CreditCard, 
@@ -40,9 +40,71 @@ const addressState = ref('')
 // Frete Selecionado
 const selectedShipping = ref<ShippingOption | null>(null)
 
+// Helpers de formatação e máscaras
+const formatCEP = (value: string) => {
+  const clean = value.replace(/\D/g, '')
+  const limited = clean.slice(0, 8)
+  if (limited.length > 5) {
+    return `${limited.slice(0, 5)}-${limited.slice(5)}`
+  }
+  return limited
+}
+
+const formatPhone = (value: string) => {
+  const clean = value.replace(/\D/g, '')
+  const limited = clean.slice(0, 11)
+  
+  if (limited.length > 10) {
+    // Celular: (XX) XXXXX-XXXX
+    return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`
+  } else if (limited.length > 6) {
+    // Telefone fixo: (XX) XXXX-XXXX
+    return `(${limited.slice(0, 2)}) ${limited.slice(2, 6)}-${limited.slice(6)}`
+  } else if (limited.length > 2) {
+    return `(${limited.slice(0, 2)}) ${limited.slice(2)}`
+  } else if (limited.length > 0) {
+    return `(${limited}`
+  }
+  return limited
+}
+
+// Watchers para máscaras automáticas
+watch(customerPhone, (newVal) => {
+  customerPhone.value = formatPhone(newVal)
+})
+
+// Computed para checar se a opção é retirada
+const isPickup = computed(() => {
+  return selectedShipping.value?.carrier.toLowerCase().includes('retirada') || false
+})
+
+const isFetchingCep = ref(false)
+
 // Fluxo de Processamento
 const isSubmitting = ref(false)
 const submitError = ref('')
+
+// Auto-busca do CEP via ViaCEP
+const lookupCep = async (cep: string) => {
+  const clean = cep.replace(/\D/g, '')
+  if (clean.length !== 8) return
+  
+  isFetchingCep.value = true
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`)
+    const data = await res.json()
+    if (!data.erro) {
+      addressStreet.value = data.logradouro || ''
+      addressNeighborhood.value = data.bairro || ''
+      addressCity.value = data.localidade || ''
+      addressState.value = data.uf || ''
+    }
+  } catch (err) {
+    console.error('Falha ao autocompletar CEP:', err)
+  } finally {
+    isFetchingCep.value = false
+  }
+}
 
 onMounted(() => {
   cartItems.value = getCart()
@@ -63,7 +125,10 @@ onMounted(() => {
     } catch(e){}
   }
   if (cachedCep) {
-    shippingCep.value = cachedCep
+    shippingCep.value = formatCEP(cachedCep)
+    if (!isPickup.value) {
+      lookupCep(cachedCep)
+    }
   }
 })
 
@@ -90,12 +155,13 @@ const formatPrice = (value: number) => {
 // Lógica de Validação e Envio
 const handleSubmitOrder = async () => {
   // Valida campos básicos
-  if (!customerName.value || !customerEmail.value || !customerPhone.value) {
+  if (!customerName.value || !customerPhone.value) {
     submitError.value = 'Por favor, preencha todos os dados de contato.'
     return
   }
   
-  if (!addressStreet.value || !addressNumber.value || !addressNeighborhood.value || !addressCity.value || !addressState.value) {
+  // Se não for retirada, valida campos de endereço
+  if (!isPickup.value && (!addressStreet.value || !addressNumber.value || !addressNeighborhood.value || !addressCity.value || !addressState.value)) {
     submitError.value = 'Por favor, preencha o endereço completo para a entrega.'
     return
   }
@@ -110,7 +176,9 @@ const handleSubmitOrder = async () => {
 
   try {
     // Monta string do endereço
-    const fullAddress = `${addressStreet.value}, nº ${addressNumber.value}${addressComplement.value ? ' (' + addressComplement.value + ')' : ''} - ${addressNeighborhood.value}, ${addressCity.value} - ${addressState.value}`
+    const fullAddress = isPickup.value
+      ? `Retirada na Loja - ${selectedShipping.value.carrier}`
+      : `${addressStreet.value}, nº ${addressNumber.value}${addressComplement.value ? ' (' + addressComplement.value + ')' : ''} - ${addressNeighborhood.value}, ${addressCity.value} - ${addressState.value}`
     
     const orderData = {
       customer_name: customerName.value.trim(),
@@ -158,15 +226,15 @@ const handleSubmitOrder = async () => {
     <!-- Cabeçalho -->
     <div class="flex items-center justify-between">
       <div class="space-y-1">
-        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-100 flex items-center gap-2">
-          <CreditCard class="w-6 h-6 text-purple-500" />
+        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-850 flex items-center gap-2">
+          <CreditCard class="w-6 h-6 text-primary" />
           Finalizar Pedido
         </h1>
-        <p class="text-slate-400 text-xs md:text-sm">
+        <p class="text-slate-500 text-xs md:text-sm">
           Preencha suas informações de contato e endereço para entrega do seu pacote.
         </p>
       </div>
-      <router-link to="/carrinho" class="text-xs md:text-sm font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 group">
+      <router-link to="/carrinho" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar ao carrinho
       </router-link>
@@ -176,113 +244,140 @@ const handleSubmitOrder = async () => {
       <!-- Formulários de Cadastro (2 Colunas) -->
       <div class="lg:col-span-2 space-y-6">
         <!-- 1. Informações de Contato -->
-        <Card class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl">
-          <CardHeader class="pb-3 border-b border-slate-900/60">
-            <CardTitle class="text-base font-bold text-slate-200 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-black">1</span>
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">1</span>
               Dados de Contato
             </CardTitle>
           </CardHeader>
           <CardContent class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-1.5 md:col-span-2">
-              <label class="text-xs font-semibold text-slate-400">Nome Completo</label>
+              <label class="text-xs font-semibold text-slate-500">Nome Completo</label>
               <Input 
                 v-model="customerName"
                 placeholder="Ex: Henrique Souza"
-                class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
+                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
               />
             </div>
-            <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-slate-400">E-mail</label>
+            <!-- <div class="space-y-1.5">
+              <label class="text-xs font-semibold text-slate-500">E-mail</label>
               <Input 
                 v-model="customerEmail"
                 type="email"
                 placeholder="Ex: henrique@exemplo.com"
-                class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
+                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
               />
-            </div>
+            </div> -->
             <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-slate-400">Celular (com DDD)</label>
+              <label class="text-xs font-semibold text-slate-500">Celular (com DDD)</label>
               <Input 
                 v-model="customerPhone"
-                placeholder="Ex: (11) 99999-9999"
-                class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
+                maxLength="15"
+                placeholder="Ex: (16) 99999-9999"
+                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
               />
             </div>
           </CardContent>
         </Card>
 
-        <!-- 2. Endereço de Entrega -->
-        <Card class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl">
-          <CardHeader class="pb-3 border-b border-slate-900/60">
-            <CardTitle class="text-base font-bold text-slate-200 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-xs font-black">2</span>
-              Endereço para Entrega
+        <!-- 2. Endereço de Entrega ou Retirada -->
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm transition-all duration-300">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">2</span>
+              {{ isPickup ? 'Retirada do Pedido' : 'Endereço para Entrega' }}
             </CardTitle>
           </CardHeader>
           <CardContent class="p-6 space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-slate-400">CEP</label>
-                <Input 
-                  v-model="shippingCep"
-                  disabled
-                  class="bg-slate-950/60 border-slate-850 text-slate-400 rounded-xl cursor-not-allowed"
-                />
-              </div>
-              <div class="space-y-1.5 md:col-span-2">
-                <label class="text-xs font-semibold text-slate-400">Logradouro (Rua/Avenida)</label>
-                <Input 
-                  v-model="addressStreet"
-                  placeholder="Ex: Avenida Paulista"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-slate-400">Número</label>
-                <Input 
-                  v-model="addressNumber"
-                  placeholder="Ex: 1000"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
-              </div>
-              <div class="space-y-1.5 md:col-span-2">
-                <label class="text-xs font-semibold text-slate-400">Complemento (Opcional)</label>
-                <Input 
-                  v-model="addressComplement"
-                  placeholder="Ex: Apto 101, Bloco B"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
+            <!-- Caso seja Retirada -->
+            <div v-if="isPickup" class="space-y-4 py-2">
+              <div class="p-4 rounded-xl bg-primary/5 border border-primary/20 text-slate-800 space-y-2">
+                <h4 class="font-extrabold text-sm flex items-center gap-1.5 text-primary">
+                  <Truck class="w-4 h-4" />
+                  Opção de Retirada na Loja Ativa
+                </h4>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                  Você escolheu retirar os produtos pessoalmente. Não é necessário preencher dados de entrega física.
+                </p>
+                <div class="border-t border-primary/10 pt-2 mt-2">
+                  <span class="text-[10px] uppercase font-bold text-primary tracking-wider">Endereço da Tabacaria</span>
+                  <p class="text-xs font-bold text-slate-900 mt-0.5">
+                    {{ selectedShipping?.carrier.replace('Retirada na Loja (', '').replace(')', '') }}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-slate-400">Bairro</label>
-                <Input 
-                  v-model="addressNeighborhood"
-                  placeholder="Ex: Bela Vista"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
+            <!-- Caso seja Entrega -->
+            <div v-else class="space-y-4">
+              <div v-if="isFetchingCep" class="text-xs text-primary flex items-center gap-2 animate-pulse py-1">
+                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                <span>Buscando CEP via ViaCEP...</span>
               </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-slate-400">Cidade</label>
-                <Input 
-                  v-model="addressCity"
-                  placeholder="Ex: São Paulo"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-500">CEP</label>
+                  <Input 
+                    v-model="shippingCep"
+                    disabled
+                    class="bg-slate-50 border-slate-200 text-slate-500 rounded-xl cursor-not-allowed"
+                  />
+                </div>
+                <div class="space-y-1.5 md:col-span-2">
+                  <label class="text-xs font-semibold text-slate-500">Logradouro (Rua/Avenida)</label>
+                  <Input 
+                    v-model="addressStreet"
+                    placeholder="Ex: Avenida Paulista"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
               </div>
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-slate-400">Estado</label>
-                <Input 
-                  v-model="addressState"
-                  placeholder="Ex: SP"
-                  class="bg-slate-950 border-slate-800 text-white rounded-xl placeholder:text-slate-700 focus-visible:ring-purple-500"
-                />
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-500">Número</label>
+                  <Input 
+                    v-model="addressNumber"
+                    placeholder="Ex: 1000"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
+                <div class="space-y-1.5 md:col-span-2">
+                  <label class="text-xs font-semibold text-slate-500">Complemento (Opcional)</label>
+                  <Input 
+                    v-model="addressComplement"
+                    placeholder="Ex: Apto 101, Bloco B"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-500">Bairro</label>
+                  <Input 
+                    v-model="addressNeighborhood"
+                    placeholder="Ex: Bela Vista"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-500">Cidade</label>
+                  <Input 
+                    v-model="addressCity"
+                    placeholder="Ex: São Paulo"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold text-slate-500">Estado</label>
+                  <Input 
+                    v-model="addressState"
+                    placeholder="Ex: SP"
+                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
@@ -292,68 +387,68 @@ const handleSubmitOrder = async () => {
       <!-- Resumo e Ação (1 Coluna) -->
       <div class="space-y-4">
         <!-- Detalhes do Frete -->
-        <Card v-if="selectedShipping" class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl p-5 flex items-center gap-3">
-          <Truck class="w-5 h-5 text-purple-400 shrink-0" />
+        <Card v-if="selectedShipping" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex items-center gap-3">
+          <Truck class="w-5 h-5 text-primary shrink-0" />
           <div class="text-xs">
-            <h5 class="font-bold text-slate-200">Entrega via {{ selectedShipping.carrier }}</h5>
+            <h5 class="font-bold text-slate-800">Entrega via {{ selectedShipping.carrier }}</h5>
             <p class="text-slate-500 mt-0.5">Prazo estimado de entrega: {{ selectedShipping.deliveryDays }} {{ selectedShipping.deliveryDays === 1 ? 'dia útil' : 'dias úteis' }}.</p>
           </div>
         </Card>
 
         <!-- Resumo do Pedido -->
-        <Card class="bg-slate-900/30 border-slate-900 rounded-2xl shadow-xl sticky top-24">
-          <CardHeader class="pb-3 border-b border-slate-900/60">
-            <CardTitle class="text-base font-bold text-slate-200">Resumo do Pedido</CardTitle>
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm sticky top-24">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold text-slate-800">Resumo do Pedido</CardTitle>
           </CardHeader>
           <CardContent class="p-6 space-y-6">
             <!-- Lista reduzida dos itens -->
-            <div class="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-800 text-xs">
+            <div class="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200 text-xs">
               <div 
                 v-for="item in cartItems" 
                 :key="item.product.id"
-                class="flex items-center justify-between gap-3 text-slate-400"
+                class="flex items-center justify-between gap-3 text-slate-500"
               >
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="font-bold text-purple-400 shrink-0">{{ item.quantity }}x</span>
-                  <span class="truncate text-slate-300 font-medium">{{ item.product.name }}</span>
+                  <span class="font-bold text-primary shrink-0">{{ item.quantity }}x</span>
+                  <span class="truncate text-slate-700 font-medium">{{ item.product.name }}</span>
                 </div>
-                <span class="shrink-0 font-semibold">{{ formatPrice(item.product.price * item.quantity) }}</span>
+                <span class="shrink-0 font-semibold text-slate-800">{{ formatPrice(item.product.price * item.quantity) }}</span>
               </div>
             </div>
 
             <!-- Divisor -->
-            <div class="border-t border-slate-900/80 my-2"></div>
+            <div class="border-t border-slate-100 my-2"></div>
 
             <!-- Custos Finais -->
             <div class="space-y-2.5 text-xs md:text-sm">
               <div class="flex justify-between text-slate-500">
                 <span>Subtotal Itens</span>
-                <span class="font-semibold text-slate-300">{{ formatPrice(itemsCost) }}</span>
+                <span class="font-semibold text-slate-750">{{ formatPrice(itemsCost) }}</span>
               </div>
               <div class="flex justify-between text-slate-500">
                 <span>Taxa de Entrega</span>
-                <span class="font-semibold text-slate-300">{{ formatPrice(shippingCost) }}</span>
+                <span class="font-semibold text-slate-750">{{ formatPrice(shippingCost) }}</span>
               </div>
               
-              <div class="border-t border-slate-900/60 my-2"></div>
+              <div class="border-t border-slate-100 my-2"></div>
               
               <div class="flex justify-between items-baseline">
-                <span class="font-bold text-slate-300">Total Geral</span>
-                <span class="font-black text-xl text-slate-200">
+                <span class="font-bold text-slate-800">Total Geral</span>
+                <span class="font-black text-xl text-slate-900">
                   {{ formatPrice(totalCost) }}
                 </span>
               </div>
             </div>
 
             <!-- Feedbacks e Erros -->
-            <div v-if="submitError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
+            <div v-if="submitError" class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-xs flex items-center gap-2 animate-shake">
               <AlertTriangle class="w-4 h-4 shrink-0" />
               <span>{{ submitError }}</span>
             </div>
 
             <!-- Botão de Finalizar -->
             <Button 
-              class="w-full rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-5 shadow-lg shadow-purple-500/20 flex items-center justify-center gap-1.5"
+              class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5 shadow-lg shadow-primary/20 flex items-center justify-center gap-1.5"
               :disabled="isSubmitting"
               @click="handleSubmitOrder"
             >
@@ -362,7 +457,7 @@ const handleSubmitOrder = async () => {
             </Button>
 
             <!-- Proteção de Compra -->
-            <div class="text-[10px] text-slate-500 text-center leading-relaxed">
+            <div class="text-[10px] text-slate-400 text-center leading-relaxed">
               Pagamento simulado. Os produtos não serão enviados de fato. Pedido será registrado na tabela `orders` do Turso DB.
             </div>
           </CardContent>

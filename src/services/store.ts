@@ -22,7 +22,7 @@ export interface CartItem {
 export interface Order {
   id?: number;
   customer_name: string;
-  customer_email: string;
+  customer_email?: string;
   customer_phone: string;
   shipping_cep: string;
   shipping_address: string;
@@ -249,6 +249,10 @@ async function initializeTables(client: any) {
       product_name TEXT,
       quantity INTEGER,
       price REAL
+    )`,
+    `CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
     )`
   ], "write");
 }
@@ -490,7 +494,7 @@ export async function createOrder(order: Omit<Order, "id" | "items">, items: Omi
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         args: [
           order.customer_name,
-          order.customer_email,
+          order.customer_email ?? null,
           order.customer_phone,
           order.shipping_cep,
           order.shipping_address,
@@ -588,10 +592,6 @@ export async function updateOrderStatus(orderId: number, status: Order["status"]
 }
 
 /* ==========================================
-   CARRINHO DO CLIENTE (Persistido localmente no navegador - Movido para o topo)
-   ========================================== */
-
-/* ==========================================
    SIMULADOR DE FRETE BRASILEIRO
    ========================================== */
 
@@ -601,7 +601,73 @@ export interface ShippingOption {
   deliveryDays: number;
 }
 
-export function calculateShipping(cep: string): ShippingOption[] {
+// Auxiliar para detectar se o CEP pertence a Cajuru-SP ou cidades vizinhas
+export function isLocalRegion(cleanCep: string): boolean {
+  const cepNum = parseInt(cleanCep, 10);
+  if (isNaN(cepNum)) return false;
+  
+  const localRanges = [
+    { name: "Cajuru", min: 14240000, max: 14249999 },
+    { name: "Cássia dos Coqueiros", min: 14260000, max: 14269999 },
+    { name: "Santa Cruz da Esperança", min: 14250000, max: 14259999 },
+    { name: "Santa Rosa de Viterbo", min: 14270000, max: 14279999 },
+    { name: "Serra Azul", min: 14230000, max: 14239999 },
+    { name: "São Simão", min: 14200000, max: 14209999 },
+    { name: "Altinópolis", min: 14350000, max: 14389999 },
+    { name: "Santo Antônio da Alegria", min: 14390000, max: 14399999 },
+    { name: "Serrana", min: 14150000, max: 14159999 },
+    { name: "Mococa", min: 13730000, max: 13759999 },
+    { name: "Tambaú", min: 13710000, max: 13714999 }
+  ];
+  
+  return localRanges.some(range => cepNum >= range.min && cepNum <= range.max);
+}
+
+// CRUD para Configurações (Settings) no banco Turso ou local
+export async function fetchSetting(key: string, defaultValue: string): Promise<string> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      const res = await client.execute({
+        sql: "SELECT value FROM settings WHERE key = ?",
+        args: [key]
+      });
+      if (res.rows.length > 0 && res.rows[0].value !== null) {
+        return String(res.rows[0].value);
+      }
+    } catch (e) {
+      console.error(`Falha ao buscar setting ${key} no Turso, usando local`, e);
+    }
+  }
+  
+  // Fallback Local Storage
+  const localVal = localStorage.getItem(`thorder_setting_${key}`);
+  if (localVal !== null) return localVal;
+  
+  localStorage.setItem(`thorder_setting_${key}`, defaultValue);
+  return defaultValue;
+}
+
+export async function saveSetting(key: string, value: string): Promise<void> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      await client.execute({
+        sql: "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        args: [key, value]
+      });
+      localStorage.setItem(`thorder_setting_${key}`, value);
+      return;
+    } catch (e) {
+      console.error(`Falha ao salvar setting ${key} no Turso, salvando local`, e);
+    }
+  }
+  
+  // Fallback Local Storage
+  localStorage.setItem(`thorder_setting_${key}`, value);
+}
+
+export async function calculateShipping(cep: string): Promise<ShippingOption[]> {
   // Limpa caracteres especiais do CEP
   const cleanCep = cep.replace(/\D/g, "");
   
@@ -609,52 +675,31 @@ export function calculateShipping(cep: string): ShippingOption[] {
     throw new Error("CEP inválido. Digite um CEP com 8 dígitos.");
   }
   
-  // Lógica de cálculo baseada na primeira casa decimal do CEP (regiões do Brasil)
-  const firstDigit = cleanCep[0];
-  let basePrice = 22.50;
-  let baseDays = 5;
+  const isLocal = isLocalRegion(cleanCep);
+  const storeAddress = await fetchSetting("store_address", "Rua Marechal Deodoro, 150 - Centro, Cajuru - SP");
   
-  switch (firstDigit) {
-    case "0": // Grande SP
-    case "1": // Interior SP
-      basePrice = 14.90;
-      baseDays = 2;
-      break;
-    case "2": // RJ e ES
-    case "3": // MG
-      basePrice = 18.50;
-      baseDays = 4;
-      break;
-    case "4": // BA, SE
-    case "5": // PE, AL, PB, RN
-      basePrice = 25.00;
-      baseDays = 6;
-      break;
-    case "6": // CE, PI, MA, AM, RR, PA, AP
-      basePrice = 32.80;
-      baseDays = 9;
-      break;
-    case "7": // DF, GO, TO, MT, MS, RO, AC
-      basePrice = 28.50;
-      baseDays = 7;
-      break;
-    case "8": // PR, SC
-    case "9": // RS
-      basePrice = 20.00;
-      baseDays = 5;
-      break;
+  if (isLocal) {
+    // CEP Local: Entrega Local (R$ 3,00) e Retirada na Loja (R$ 0,00)
+    return [
+      {
+        carrier: "Entrega Local (Cajuru e Região)",
+        price: 3.00,
+        deliveryDays: 1
+      },
+      {
+        carrier: `Retirada na Loja (${storeAddress})`,
+        price: 0.00,
+        deliveryDays: 0
+      }
+    ];
+  } else {
+    // Fora da região: Apenas Retirada na Loja
+    return [
+      {
+        carrier: `Retirada na Loja (${storeAddress})`,
+        price: 0.00,
+        deliveryDays: 0
+      }
+    ];
   }
-  
-  return [
-    {
-      carrier: "Correios PAC (Econômico)",
-      price: basePrice,
-      deliveryDays: baseDays
-    },
-    {
-      carrier: "Correios SEDEX (Expresso)",
-      price: Number((basePrice * 1.8 + 5).toFixed(2)),
-      deliveryDays: Math.max(1, baseDays - 3)
-    }
-  ];
 }

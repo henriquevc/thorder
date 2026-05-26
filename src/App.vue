@@ -75,17 +75,21 @@ const handleAdminLogout = () => {
           <router-link 
             v-if="!isAdminRoute()"
             to="/carrinho" 
-            class="relative w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-300"
+            class="relative w-10 h-10 sm:w-auto sm:px-3.5 rounded-xl border flex items-center justify-center gap-2 transition-all duration-300"
             :class="[
               themeMode === 'dark' ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white' : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900',
               animateCart ? 'scale-110 border-primary bg-primary/10 text-primary' : ''
             ]"
           >
-            <ShoppingBag class="w-5 h-5 transition-transform duration-300" :class="{ 'animate-bounce': animateCart }" />
+            <ShoppingBag class="w-5 h-5 transition-transform duration-300 shrink-0" :class="{ 'animate-bounce': animateCart }" />
+            <span class="hidden sm:inline text-xs font-bold uppercase tracking-wider">Carrinho</span>
             <!-- Contador animado -->
             <span 
               v-if="cartCount > 0"
-              class="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gradient-to-r from-brand-start to-brand-end px-1 text-[10px] font-bold text-white shadow-md shadow-brand-end/30 transition-transform duration-300"
+              class="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gradient-to-r from-brand-start to-brand-end px-1 text-[10px] font-bold text-white shadow-md shadow-brand-end/30 transition-transform duration-300"
+              :class="[
+                'absolute -top-1.5 -right-1.5 sm:static sm:translate-y-0'
+              ]"
             >
               {{ cartCount }}
             </span>

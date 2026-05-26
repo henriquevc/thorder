@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   Search, 
   ShoppingBag, 
@@ -8,15 +9,20 @@ import {
   AlertTriangle,
   Tag,
   Loader2,
-  Sparkles
+  Sparkles,
+  Minus,
+  Plus,
+  Trash2
 } from 'lucide-vue-next'
 import { 
   fetchProducts, 
   saveCart, 
   getCart, 
+  cartCount,
   themeMode,
   themeColor,
-  type Product 
+  type Product,
+  type CartItem
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +47,16 @@ const showQuickView = ref(false)
 // Feedbacks de adicionar ao carrinho
 const addedProductId = ref<number | null>(null)
 
+// Controle do Dialog do Carrinho
+const router = useRouter()
+const showCartDialog = ref(false)
+const cartItems = ref<CartItem[]>([])
+
+// Cálculo de Subtotal do Carrinho
+const subtotal = computed(() => {
+  return cartItems.value.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+})
+
 // Carrega produtos ao montar a tela
 onMounted(async () => {
   try {
@@ -50,6 +66,7 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+  cartItems.value = getCart()
 })
 
 // Lista de Categorias únicas
@@ -97,12 +114,47 @@ const handleAddToCart = (product: Product, event?: Event) => {
   }
   
   saveCart(cart)
+  cartItems.value = cart
   
   // Feedback visual de sucesso
   addedProductId.value = product.id || null
   setTimeout(() => {
     addedProductId.value = null
   }, 1500)
+
+  // Abre o dialog de carrinho
+  showCartDialog.value = true
+}
+
+// Alterar quantidade no dialog de carrinho
+const updateQuantity = (item: CartItem, delta: number) => {
+  const newQty = item.quantity + delta
+  
+  if (newQty <= 0) {
+    handleRemoveItem(item.product.id!)
+    return
+  }
+  
+  // Limita pelo estoque disponível
+  if (newQty > item.product.stock) {
+    alert(`Desculpe, o estoque máximo deste produto é de ${item.product.stock} unidades.`)
+    return
+  }
+  
+  item.quantity = newQty
+  saveCart(cartItems.value)
+}
+
+// Excluir item do carrinho pelo dialog
+const handleRemoveItem = (productId: number) => {
+  cartItems.value = cartItems.value.filter(item => item.product.id !== productId)
+  saveCart(cartItems.value)
+}
+
+// Ir para a página de carrinho / finalizar compra
+const goToCart = () => {
+  showCartDialog.value = false
+  router.push('/carrinho')
 }
 
 // Abrir detalhes do produto
@@ -406,6 +458,117 @@ const addAndCloseQuickView = (product: Product) => {
                 Adicionar
               </Button>
             </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Modal Carrinho de Compras (Cart Dialog) -->
+    <Dialog v-model:open="showCartDialog">
+      <DialogContent class="sm:max-w-[500px] rounded-3xl p-6 overflow-hidden shadow-2xl transition-colors duration-300"
+        :class="themeMode === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'"
+      >
+        <DialogHeader class="border-b pb-4 mb-4" :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'">
+          <DialogTitle class="text-lg font-extrabold flex items-center gap-2">
+            <ShoppingBag class="w-5 h-5 text-primary" />
+            Carrinho de Compras
+          </DialogTitle>
+          <DialogDescription class="text-xs" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-550'">
+            Você tem {{ cartCount }} {{ cartCount === 1 ? 'item' : 'itens' }} no seu carrinho.
+          </DialogDescription>
+        </DialogHeader>
+
+        <!-- Lista de itens do carrinho -->
+        <div class="max-h-[300px] overflow-y-auto space-y-4 pr-1 scrollbar-thin"
+          :class="themeMode === 'dark' ? 'scrollbar-thumb-slate-800' : 'scrollbar-thumb-slate-200'"
+        >
+          <div v-if="cartItems.length === 0" class="text-center py-8 text-slate-500 text-sm">
+            Seu carrinho está vazio.
+          </div>
+          <div v-else
+            v-for="item in cartItems"
+            :key="item.product.id"
+            class="flex items-center justify-between gap-4 py-2 border-b"
+            :class="themeMode === 'dark' ? 'border-slate-800/60' : 'border-slate-100'"
+          >
+            <!-- Detalhes do item -->
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-12 h-12 rounded-xl bg-slate-950 overflow-hidden border shrink-0"
+                :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-100'"
+              >
+                <img :src="item.product.image_data" :alt="item.product.name" class="w-full h-full object-cover" />
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-bold text-xs truncate" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
+                  {{ item.product.name }}
+                </h4>
+                <p class="text-[10px] font-semibold text-primary mt-0.5">
+                  {{ formatPrice(item.product.price) }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Controles de Quantidade e Exclusão -->
+            <div class="flex items-center gap-3 shrink-0">
+              <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5"
+                :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'"
+              >
+                <button 
+                  class="h-5 w-5 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-xs"
+                  :class="themeMode === 'dark' ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-200 hover:text-slate-800'"
+                  @click="updateQuantity(item, -1)"
+                >
+                  <Minus class="w-3 h-3" />
+                </button>
+                <span class="w-4 text-center text-[10px] font-bold" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
+                  {{ item.quantity }}
+                </span>
+                <button 
+                  class="h-5 w-5 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-xs"
+                  :class="themeMode === 'dark' ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-200 hover:text-slate-800'"
+                  @click="updateQuantity(item, 1)"
+                >
+                  <Plus class="w-3 h-3" />
+                </button>
+              </div>
+              
+              <button 
+                class="text-slate-400 hover:text-red-550 p-1"
+                @click="handleRemoveItem(item.product.id!)"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtotal -->
+        <div class="border-t pt-4 mt-4 space-y-3" :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'">
+          <div class="flex justify-between items-baseline text-sm">
+            <span class="font-bold" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-550'">Subtotal</span>
+            <span class="font-extrabold text-base text-primary">
+              {{ formatPrice(subtotal) }}
+            </span>
+          </div>
+
+          <!-- Botões -->
+          <div class="flex items-center gap-3 pt-2">
+            <Button 
+              variant="outline" 
+              class="rounded-xl font-bold flex-1 border shadow-sm transition-all duration-200"
+              :class="themeMode === 'dark' 
+                ? 'bg-slate-950 border-slate-800 hover:bg-slate-800 text-slate-300' 
+                : 'bg-white border-slate-205 hover:bg-slate-100 text-slate-700'"
+              @click="showCartDialog = false"
+            >
+              Continuar Comprando
+            </Button>
+            <Button 
+              class="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold flex-1 shadow-lg shadow-primary/20"
+              @click="goToCart"
+            >
+              Finalizar Compra
+            </Button>
           </div>
         </div>
       </DialogContent>

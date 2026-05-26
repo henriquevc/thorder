@@ -6,7 +6,6 @@ import {
   Eye, 
   Check, 
   AlertTriangle,
-  Database,
   Tag,
   Loader2,
   Sparkles
@@ -15,7 +14,6 @@ import {
   fetchProducts, 
   saveCart, 
   getCart, 
-  isDbConnected,
   themeMode,
   themeColor,
   type Product 
@@ -151,7 +149,7 @@ const addAndCloseQuickView = (product: Product) => {
           <p class="text-sm md:text-base leading-relaxed"
             :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
           >
-            A arte da fumaça em alta performance. Explore nossa seleção exclusiva de narguilés de luxo, roshs esmaltados, essências selecionadas das melhores marcas e acessórios de alto rendimento. Sincronizado em tempo real na nuvem.
+            A arte da fumaça em alta performance. Explore nossa seleção exclusiva de narguilés de luxo, roshs esmaltados, essências selecionadas das melhores marcas e acessórios de alto rendimento
           </p>
         </div>
 
@@ -169,17 +167,6 @@ const addAndCloseQuickView = (product: Product) => {
             />
           </div>
         </div>
-      </div>
-
-      <!-- Tag de Status de Conexão no Banner -->
-      <div class="absolute bottom-4 right-4 flex items-center gap-2 backdrop-blur-md px-3.5 py-1.5 rounded-xl border text-xs transition-colors"
-        :class="themeMode === 'dark' ? 'bg-slate-955/60 border-slate-800' : 'bg-white/60 border-slate-200'"
-      >
-        <Database class="w-3.5 h-3.5" :class="isDbConnected ? 'text-emerald-500' : 'text-amber-500'" />
-        <span class="text-slate-400" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Dados salvos em:</span>
-        <span class="font-bold" :class="isDbConnected ? 'text-emerald-555' : 'text-amber-500'">
-          {{ isDbConnected ? 'Turso DB' : 'Local Storage' }}
-        </span>
       </div>
     </section>
 

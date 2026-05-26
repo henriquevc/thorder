@@ -10,7 +10,10 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  Palette,
+  Sun,
+  Moon
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -21,6 +24,8 @@ import {
   clearTursoConfig,
   themeMode,
   themeColor,
+  setThemeMode,
+  setThemeColor,
   type Order, 
   type Product 
 } from '@/services/store'
@@ -255,7 +260,7 @@ const formatPrice = (val: number) => {
           <TabsTrigger value="banco" class="rounded-lg text-xs md:text-sm font-bold px-5 py-2 transition-all"
             :class="themeMode === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-655 hover:text-slate-900'"
           >
-            Banco de Dados
+            Configurações
           </TabsTrigger>
         </TabsList>
       </div>
@@ -270,8 +275,125 @@ const formatPrice = (val: number) => {
         <AdminOrders />
       </TabsContent>
 
-      <!-- Tab Conteúdo: Banco de Dados -->
+      <!-- Tab Conteúdo: Configurações -->
       <TabsContent value="banco" class="outline-none space-y-6">
+        
+        <!-- 1. PERSONALIZAÇÃO VISUAL -->
+        <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
+          :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
+        >
+          <CardHeader class="border-b pb-4" :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'">
+            <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+              :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+            >
+              <Palette class="w-5 h-5 text-primary" />
+              Aparência da Loja Virtual
+            </CardTitle>
+            <p class="text-slate-400 text-xs mt-1">
+              Personalize o tema visual e as cores de destaque que serão aplicados a todos os clientes.
+            </p>
+          </CardHeader>
+          
+          <CardContent class="p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Tema Dark/Light -->
+              <div class="space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Tema do Projeto</span>
+                <p class="text-[10px] text-slate-500 mb-2">Selecione se o layout principal da loja deve ser escuro ou claro.</p>
+                <div class="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    class="rounded-xl font-bold transition-all"
+                    :class="themeMode === 'light' 
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 hover:text-primary-foreground' 
+                      : 'text-slate-400 border-slate-800 hover:bg-slate-800'"
+                    @click="setThemeMode('light')"
+                  >
+                    <Sun class="w-4 h-4 mr-1.5 text-amber-500" />
+                    Modo Claro (Recomendado Creme)
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    class="rounded-xl font-bold transition-all"
+                    :class="themeMode === 'dark' 
+                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 hover:text-primary-foreground' 
+                      : 'text-slate-550 border-slate-200 hover:bg-slate-100'"
+                    @click="setThemeMode('dark')"
+                  >
+                    <Moon class="w-4 h-4 mr-1.5 text-purple-400" />
+                    Modo Escuro (Obsidian)
+                  </Button>
+                </div>
+              </div>
+
+              <!-- Cor de Destaque -->
+              <div class="space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cor de Destaque (Accent)</span>
+                <p class="text-[10px] text-slate-500 mb-2">Selecione a cor de acento dos botões, badges e ícones.</p>
+                <div class="flex items-center gap-2 pt-1">
+                  <!-- Gold -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-[#C5A880] border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'gold' ? 'border-primary scale-110 shadow-lg shadow-primary/50' : 'border-transparent hover:scale-105'"
+                    title="Dourado Champagne (Padrão)"
+                    @click="setThemeColor('gold')"
+                  >
+                    <Check v-if="themeColor === 'gold'" class="w-4 h-4" />
+                  </button>
+                  <!-- Purple -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-purple-500 border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'purple' ? 'border-purple-300 scale-110 shadow-lg shadow-purple-500/50' : 'border-transparent hover:scale-105'"
+                    title="Roxo Premium"
+                    @click="setThemeColor('purple')"
+                  >
+                    <Check v-if="themeColor === 'purple'" class="w-4 h-4" />
+                  </button>
+                  <!-- Emerald -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-emerald-500 border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'emerald' ? 'border-emerald-300 scale-110 shadow-lg shadow-emerald-500/50' : 'border-transparent hover:scale-105'"
+                    title="Verde Esmeralda"
+                    @click="setThemeColor('emerald')"
+                  >
+                    <Check v-if="themeColor === 'emerald'" class="w-4 h-4" />
+                  </button>
+                  <!-- Blue -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-blue-500 border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'blue' ? 'border-blue-300 scale-110 shadow-lg shadow-blue-500/50' : 'border-transparent hover:scale-105'"
+                    title="Azul Elétrico"
+                    @click="setThemeColor('blue')"
+                  >
+                    <Check v-if="themeColor === 'blue'" class="w-4 h-4" />
+                  </button>
+                  <!-- Orange -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-orange-500 border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'orange' ? 'border-orange-350 scale-110 shadow-lg shadow-orange-500/50' : 'border-transparent hover:scale-105'"
+                    title="Laranja Vibrante"
+                    @click="setThemeColor('orange')"
+                  >
+                    <Check v-if="themeColor === 'orange'" class="w-4 h-4" />
+                  </button>
+                  <!-- Red -->
+                  <button 
+                    class="w-8 h-8 rounded-full bg-red-500 border-2 transition-transform duration-200 flex items-center justify-center text-white"
+                    :class="themeColor === 'red' ? 'border-red-300 scale-110 shadow-lg shadow-red-500/50' : 'border-transparent hover:scale-105'"
+                    title="Vermelho Carmesim"
+                    @click="setThemeColor('red')"
+                  >
+                    <Check v-if="themeColor === 'red'" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- 2. SINCRONIZAÇÃO DE BANCO DE DADOS -->
         <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
           :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
         >

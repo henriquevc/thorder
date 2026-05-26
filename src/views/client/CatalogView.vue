@@ -143,7 +143,7 @@ const addAndCloseQuickView = (product: Product) => {
           <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
             :class="themeMode === 'dark' ? 'bg-gradient-to-r from-white via-slate-100 to-primary bg-clip-text text-transparent' : 'text-slate-900'"
           >
-            Tabacaria <span class="text-primary">X-Smoke</span>
+            <span class="text-primary">X-Smoke</span> Tabacaria 
           </h1>
           
           <p class="text-sm md:text-base leading-relaxed"

@@ -61,21 +61,16 @@ const LOCAL_ORDER_ITEMS_KEY = "thorder_local_order_items";
 // ==========================================
 // CONTROLE DE TEMAS E CUSTOMIZAÇÃO DE CORES
 // ==========================================
-export const themeMode = ref<'dark' | 'light'>((localStorage.getItem("theme_mode") as any) || 'dark');
+export const themeMode = ref<'dark' | 'light'>('light');
 export const themeColor = ref<string>(localStorage.getItem("theme_color") || 'gold');
 
 export function applyTheme() {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   
-  // Classe dark/light no elemento raiz (HTML)
-  if (themeMode.value === 'dark') {
-    root.classList.add('dark');
-    root.classList.remove('light');
-  } else {
-    root.classList.add('light');
-    root.classList.remove('dark');
-  }
+  // Sempre força o modo claro (light) no elemento raiz
+  root.classList.add('light');
+  root.classList.remove('dark');
   
   // Classe do tema de cor
   const colorClasses = ['theme-gold', 'theme-purple', 'theme-emerald', 'theme-blue', 'theme-orange', 'theme-red'];
@@ -84,8 +79,8 @@ export function applyTheme() {
 }
 
 export function setThemeMode(mode: 'dark' | 'light') {
-  themeMode.value = mode;
-  localStorage.setItem("theme_mode", mode);
+  themeMode.value = 'light';
+  localStorage.setItem("theme_mode", 'light');
   applyTheme();
 }
 

@@ -72,8 +72,8 @@ const handleAdminLogout = () => {
         <div class="flex items-center gap-8">
           <router-link to="/" class="flex items-center group py-1">
             <img 
-              src="/logo_horizontal.jpg" 
-              alt="Tabacaria X-Smoke" 
+              src="/logo_horizontal.png" 
+              alt="X-Smoke Tabacaria" 
               class="h-10 md:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-102"
             />
           </router-link>
@@ -133,7 +133,7 @@ const handleAdminLogout = () => {
         <p class="text-sm font-semibold tracking-wide"
           :class="themeMode === 'dark' ? 'bg-gradient-to-r from-slate-200 to-slate-400 bg-clip-text text-transparent' : 'text-slate-700'"
         >
-          Tabacaria X-Smoke &copy; 2026
+          X-Smoke Tabacaria &copy; 2026
         </p>
       </div>
     </footer>

@@ -11,9 +11,7 @@ import {
   Check,
   AlertTriangle,
   AlertCircle,
-  Palette,
-  Sun,
-  Moon
+  Palette
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -24,7 +22,6 @@ import {
   clearTursoConfig,
   themeMode,
   themeColor,
-  setThemeMode,
   setThemeColor,
   type Order, 
   type Product 
@@ -290,44 +287,12 @@ const formatPrice = (val: number) => {
               Aparência da Loja Virtual
             </CardTitle>
             <p class="text-slate-400 text-xs mt-1">
-              Personalize o tema visual e as cores de destaque que serão aplicados a todos os clientes.
+              Personalize a cor de destaque aplicada a todos os clientes. O visual está fixado no elegante Modo Claro (Creme marfim).
             </p>
           </CardHeader>
           
           <CardContent class="p-6 space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <!-- Tema Dark/Light -->
-              <div class="space-y-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Tema do Projeto</span>
-                <p class="text-[10px] text-slate-500 mb-2">Selecione se o layout principal da loja deve ser escuro ou claro.</p>
-                <div class="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    class="rounded-xl font-bold transition-all"
-                    :class="themeMode === 'light' 
-                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 hover:text-primary-foreground' 
-                      : 'text-slate-400 border-slate-800 hover:bg-slate-800'"
-                    @click="setThemeMode('light')"
-                  >
-                    <Sun class="w-4 h-4 mr-1.5 text-amber-500" />
-                    Modo Claro (Recomendado Creme)
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    class="rounded-xl font-bold transition-all"
-                    :class="themeMode === 'dark' 
-                      ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 hover:text-primary-foreground' 
-                      : 'text-slate-550 border-slate-200 hover:bg-slate-100'"
-                    @click="setThemeMode('dark')"
-                  >
-                    <Moon class="w-4 h-4 mr-1.5 text-purple-400" />
-                    Modo Escuro (Obsidian)
-                  </Button>
-                </div>
-              </div>
-
+            <div class="max-w-xl">
               <!-- Cor de Destaque -->
               <div class="space-y-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cor de Destaque (Accent)</span>

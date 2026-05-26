@@ -121,10 +121,10 @@ const addAndCloseQuickView = (product: Product) => {
 
 <template>
   <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <!-- Hero Banner Premium -->
+    <!-- Hero Banner Premium Tabacaria -->
     <section class="relative overflow-hidden rounded-3xl border transition-colors duration-300 p-8 md:p-12 shadow-2xl"
       :class="themeMode === 'dark' 
-        ? 'border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/20' 
+        ? 'border-slate-850 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/15' 
         : 'border-slate-200 bg-gradient-to-br from-white via-white to-primary/5'"
     >
       <!-- Glow Decorativo no banner -->
@@ -132,28 +132,48 @@ const addAndCloseQuickView = (product: Product) => {
         <div class="absolute -top-1/2 -right-1/4 w-96 h-96 rounded-full bg-primary/10 blur-[80px]"></div>
       </div>
       
-      <div class="max-w-2xl space-y-4 relative z-10">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
-          :class="themeMode === 'dark' ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-primary/5 border-primary/15 text-primary'"
-        >
-          <Sparkles class="w-3.5 h-3.5" />
-          Coleção Exclusiva &amp; Premium
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center relative z-10">
+        <!-- Coluna Texto -->
+        <div class="md:col-span-8 space-y-4 text-left">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+            :class="themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary'"
+          >
+            <Sparkles class="w-3.5 h-3.5" />
+            Hookah Shop &amp; Tabacaria Premium
+          </div>
+          
+          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
+            :class="themeMode === 'dark' ? 'bg-gradient-to-r from-white via-slate-100 to-primary bg-clip-text text-transparent' : 'text-slate-900'"
+          >
+            Tabacaria <span class="text-primary">X-Smoke</span>
+          </h1>
+          
+          <p class="text-sm md:text-base leading-relaxed"
+            :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
+          >
+            A arte da fumaça em alta performance. Explore nossa seleção exclusiva de narguilés de luxo, roshs esmaltados, essências selecionadas das melhores marcas e acessórios de alto rendimento. Sincronizado em tempo real na nuvem.
+          </p>
         </div>
-        <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight transition-colors"
-          :class="themeMode === 'dark' ? 'bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent' : 'text-slate-900'"
-        >
-          Periféricos &amp; Acessórios de Alta Performance
-        </h1>
-        <p class="text-sm md:text-base leading-relaxed"
-          :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'"
-        >
-          Explore periféricos de luxo para elevar seu ambiente de trabalho ou setup gamer. Produtos conectados à nuvem e com entrega garantida para todo o Brasil.
-        </p>
+
+        <!-- Coluna Logo Integrado -->
+        <div class="md:col-span-4 flex items-center justify-center">
+          <div class="relative group">
+            <!-- Glow externo dourado no dark mode -->
+            <div v-if="themeMode === 'dark'" class="absolute inset-0 rounded-full bg-primary/25 blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-500"></div>
+            
+            <img 
+              src="/logo.jpg" 
+              alt="Logo Tabacaria X-Smoke" 
+              class="relative w-40 h-40 md:w-48 md:h-48 rounded-full border-4 border-primary shadow-2xl object-cover transition-all duration-500 group-hover:scale-105"
+              :class="themeMode === 'dark' ? 'border-primary shadow-primary/10' : 'border-primary/60 shadow-slate-400/20'"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Tag de Status de Conexão no Banner -->
       <div class="absolute bottom-4 right-4 flex items-center gap-2 backdrop-blur-md px-3.5 py-1.5 rounded-xl border text-xs transition-colors"
-        :class="themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-white/60 border-slate-200'"
+        :class="themeMode === 'dark' ? 'bg-slate-955/60 border-slate-800' : 'bg-white/60 border-slate-200'"
       >
         <Database class="w-3.5 h-3.5" :class="isDbConnected ? 'text-emerald-500' : 'text-amber-500'" />
         <span class="text-slate-400" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'">Dados salvos em:</span>

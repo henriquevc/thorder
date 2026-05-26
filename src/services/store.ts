@@ -62,7 +62,7 @@ const LOCAL_ORDER_ITEMS_KEY = "thorder_local_order_items";
 // CONTROLE DE TEMAS E CUSTOMIZAÇÃO DE CORES
 // ==========================================
 export const themeMode = ref<'dark' | 'light'>((localStorage.getItem("theme_mode") as any) || 'dark');
-export const themeColor = ref<string>(localStorage.getItem("theme_color") || 'purple');
+export const themeColor = ref<string>(localStorage.getItem("theme_color") || 'gold');
 
 export function applyTheme() {
   if (typeof document === 'undefined') return;
@@ -78,7 +78,7 @@ export function applyTheme() {
   }
   
   // Classe do tema de cor
-  const colorClasses = ['theme-purple', 'theme-emerald', 'theme-blue', 'theme-orange', 'theme-red'];
+  const colorClasses = ['theme-gold', 'theme-purple', 'theme-emerald', 'theme-blue', 'theme-orange', 'theme-red'];
   colorClasses.forEach(c => root.classList.remove(c));
   root.classList.add(`theme-${themeColor.value}`);
 }
@@ -100,48 +100,47 @@ if (typeof document !== 'undefined') {
   applyTheme();
 }
 
-
 // SVGs elegantes codificados para os produtos de exemplo (fallback)
-const KEYBOARD_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="kb-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%231e1b4b;stop-opacity:1" /><stop offset="100%" style="stop-color:%23311042;stop-opacity:1" /></linearGradient><linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:%23a855f7;stop-opacity:1" /><stop offset="100%" style="stop-color:%23ec4899;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23kb-grad)" /><rect x="40" y="80" width="320" height="140" rx="10" fill="%230f172a" stroke="url(%23neon)" stroke-width="2" /><g fill="%23334155" stroke="%23475569" stroke-width="1"><rect x="60" y="100" width="30" height="20" rx="3" /><rect x="100" y="100" width="20" height="20" rx="3" /><rect x="130" y="100" width="20" height="20" rx="3" /><rect x="160" y="100" width="20" height="20" rx="3" /><rect x="190" y="100" width="20" height="20" rx="3" /><rect x="220" y="100" width="20" height="20" rx="3" /><rect x="250" y="100" width="20" height="20" rx="3" /><rect x="280" y="100" width="20" height="20" rx="3" /><rect x="310" y="100" width="30" height="20" rx="3" fill="%23475569" /><rect x="60" y="130" width="25" height="20" rx="3" /><rect x="95" y="130" width="20" height="20" rx="3" /><rect x="125" y="130" width="20" height="20" rx="3" /><rect x="155" y="130" width="20" height="20" rx="3" /><rect x="185" y="130" width="20" height="20" rx="3" /><rect x="215" y="130" width="20" height="20" rx="3" /><rect x="245" y="130" width="20" height="20" rx="3" /><rect x="275" y="130" width="20" height="20" rx="3" /><rect x="305" y="130" width="35" height="20" rx="3" fill="%23475569" /><rect x="60" y="160" width="35" height="20" rx="3" fill="%23475569" /><rect x="105" y="160" width="20" height="20" rx="3" /><rect x="135" y="160" width="20" height="20" rx="3" /><rect x="165" y="160" width="70" height="20" rx="3" fill="%23ec4899" /><rect x="245" y="160" width="20" height="20" rx="3" /><rect x="275" y="160" width="20" height="20" rx="3" /><rect x="305" y="160" width="35" height="20" rx="3" fill="%23a855f7" /></g><text x="200" y="260" font-family="sans-serif" font-weight="bold" font-size="20" fill="%23f8fafc" text-anchor="middle">Teclado Ultra Premium</text><text x="200" y="280" font-family="sans-serif" font-size="12" fill="%2394a3b8" text-anchor="middle">Switches Lubrificados &amp; RGB</text></svg>`;
+const HOOKAH_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="hk-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23151515;stop-opacity:1" /><stop offset="100%" style="stop-color:%23050505;stop-opacity:1" /></linearGradient><linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:%23c5a880;stop-opacity:1" /><stop offset="50%" style="stop-color:%23e2d1b9;stop-opacity:1" /><stop offset="100%" style="stop-color:%239a7b56;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23hk-grad)" /><g stroke="url(%23gold)" fill="none" stroke-linecap="round" opacity="0.15" stroke-width="1.5"><path d="M50 150 Q100 100 200 150 T350 150" /><path d="M50 120 Q100 70 200 120 T350 120" /><path d="M50 180 Q100 130 200 180 T350 180" /></g><g fill="none" stroke="url(%23gold)" stroke-width="2.5"><path d="M190 60 C190 60, 195 40, 190 35 C185 30, 200 25, 200 15" stroke-width="1.5" opacity="0.6" /><path d="M210 60 C210 60, 215 45, 210 40 C205 35, 215 30, 215 20" stroke-width="1.5" opacity="0.6" /><path d="M185 85 L215 85" stroke-width="4" /><path d="M185 105 L215 105" stroke-width="4" /><path d="M200 65 L200 210" stroke-width="5" /><rect x="180" y="65" width="40" height="15" rx="3" fill="url(%23gold)" /><ellipse cx="200" cy="115" rx="30" ry="10" fill="url(%23gold)" /><ellipse cx="200" cy="165" rx="35" ry="12" fill="url(%23gold)" /><path d="M170 215 C170 170, 230 170, 230 215 C230 240, 220 250, 200 250 C180 250, 170 240, 170 215 Z" fill="%230f0f0f" stroke="url(%23gold)" stroke-width="3" /><path d="M178 185 C160 185, 140 200, 140 220 C140 230, 145 235, 150 235" stroke-width="3" /><path d="M140 220 L110 210 Q90 200 100 170 L115 130" stroke-width="4" /><rect x="110" y="115" width="10" height="20" rx="2" fill="url(%23gold)" /></g><text x="200" y="275" font-family="sans-serif" font-weight="bold" font-size="16" fill="%23FAF7F2" text-anchor="middle">Narguilé Triton Hookah Gold</text><text x="200" y="290" font-family="sans-serif" font-size="10" fill="%23c5a880" text-anchor="middle">Sopros de Ouro &amp; Obsidian</text></svg>`;
 
-const MOUSE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="ms-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23022c22;stop-opacity:1" /><stop offset="100%" style="stop-color:%23020617;stop-opacity:1" /></linearGradient><linearGradient id="neon-green" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2310b981;stop-opacity:1" /><stop offset="100%" style="stop-color:%2306b6d4;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23ms-grad)" /><path d="M200 60 C150 60, 140 140, 140 180 C140 230, 170 240, 200 240 C230 240, 260 230, 260 180 C260 140, 250 60, 200 60 Z" fill="%230f172a" stroke="url(%23neon-green)" stroke-width="2" /><path d="M200 60 L200 130" stroke="url(%23neon-green)" stroke-width="1.5" /><rect x="194" y="80" width="12" height="25" rx="6" fill="%2310b981" /><circle cx="200" cy="180" r="15" fill="none" stroke="%2306b6d4" stroke-width="1" stroke-dasharray="4,4" /><text x="200" y="270" font-family="sans-serif" font-weight="bold" font-size="20" fill="%23f8fafc" text-anchor="middle">Mouse Ergonomic Wireless</text></svg>`;
+const ESSENCE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="es-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%231c1917;stop-opacity:1" /><stop offset="100%" style="stop-color:%230c0a09;stop-opacity:1" /></linearGradient><linearGradient id="gold-bright" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:%23d4af37;stop-opacity:1" /><stop offset="100%" style="stop-color:%23f3e5ab;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23es-grad)" /><rect x="110" y="60" width="180" height="150" rx="12" fill="%231a1a1a" stroke="url(%23gold-bright)" stroke-width="2" /><rect x="125" y="75" width="150" height="120" rx="6" fill="%230c0a09" opacity="0.8" /><path d="M200 95 C190 95, 175 105, 175 120 C175 135, 200 135, 200 145 C200 155, 185 160, 185 160" fill="none" stroke="url(%23gold-bright)" stroke-width="2" stroke-linecap="round" opacity="0.3" /><text x="200" y="125" font-family="sans-serif" font-weight="black" font-size="24" fill="url(%23gold-bright)" text-anchor="middle">NAY</text><text x="200" y="145" font-family="sans-serif" font-weight="bold" font-size="11" fill="%23ffffff" tracking-wider="3" text-anchor="middle">SECRET</text><rect x="140" y="165" width="120" height="18" rx="4" fill="%23d4af37" /><text x="200" y="178" font-family="sans-serif" font-weight="bold" font-size="8" fill="%231a1a1a" text-anchor="middle">PREMIUM SHISHA</text><text x="200" y="250" font-family="sans-serif" font-weight="bold" font-size="18" fill="%23FAF7F2" text-anchor="middle">Essência Nay Secret (10 un.)</text><text x="200" y="270" font-family="sans-serif" font-size="10" fill="%23FAF7F2" opacity="0.6" text-anchor="middle">Fardo Fechado de Alta Duração</text></svg>`;
 
-const BACKPACK_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="bp-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23180828;stop-opacity:1" /><stop offset="100%" style="stop-color:%230b0214;stop-opacity:1" /></linearGradient><linearGradient id="neon-orange" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23f97316;stop-opacity:1" /><stop offset="100%" style="stop-color:%23ef4444;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23bp-grad)" /><path d="M140 230 L140 100 C140 70, 160 50, 200 50 C240 50, 260 70, 260 100 L260 230 C260 250, 240 260, 200 260 C160 260, 140 250, 140 230 Z" fill="%231e293b" stroke="url(%23neon-orange)" stroke-width="2" /><path d="M140 120 L260 120" stroke="%23f97316" stroke-width="1.5" /><path d="M140 170 L260 170" stroke="%23475569" stroke-width="1" /><rect x="180" y="130" width="40" height="30" rx="4" fill="%230f172a" stroke="%23ef4444" stroke-width="1" /><text x="200" y="285" font-family="sans-serif" font-weight="bold" font-size="18" fill="%23f8fafc" text-anchor="middle">Mochila Developer Pro</text></svg>`;
+const CHARCOAL_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="ch-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%230f172a;stop-opacity:1" /><stop offset="100%" style="stop-color:%23020617;stop-opacity:1" /></linearGradient><linearGradient id="ember" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:%23ef4444;stop-opacity:1" /><stop offset="50%" style="stop-color:%23f97316;stop-opacity:1" /><stop offset="100%" style="stop-color:%23eab308;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23ch-grad)" /><g transform="translate(0, -10)"><polygon points="150,110 200,85 250,110 200,135" fill="%231e293b" stroke="%23334155" stroke-width="1.5" /><polygon points="150,110 200,135 200,195 150,170" fill="%230f172a" stroke="%231e293b" stroke-width="1.5" /><polygon points="250,110 200,135 200,195 250,170" fill="%23020617" stroke="%230f172a" stroke-width="1.5" /><polygon points="175,138 200,125 225,138 200,150" fill="url(%23ember)" opacity="0.85" /><polygon points="175,138 200,150 200,185 175,173" fill="url(%23ember)" opacity="0.6" /><polygon points="225,138 200,150 200,185 225,173" fill="url(%23ember)" opacity="0.7" /><circle cx="200" cy="143" r="10" fill="%23ffffff" filter="blur(4px)" opacity="0.3" /><path d="M190 70 Q200 50 195 40 T210 20" stroke="%23ffffff" fill="none" opacity="0.3" stroke-width="1.5" /></g><text x="200" y="250" font-family="sans-serif" font-weight="bold" font-size="18" fill="%23FAF7F2" text-anchor="middle">Carvão de Coco Art Coco (1kg)</text><text x="200" y="270" font-family="sans-serif" font-size="10" fill="%23f97316" font-weight="bold" text-anchor="middle">Sem Cheiro &amp; Longa Constância Térmica</text></svg>`;
 
-const MUG_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="mug-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%231e293b;stop-opacity:1" /><stop offset="100%" style="stop-color:%230f172a;stop-opacity:1" /></linearGradient><linearGradient id="neon-cyan" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2306b6d4;stop-opacity:1" /><stop offset="100%" style="stop-color:%233b82f6;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23mug-grad)" /><rect x="150" y="90" width="100" height="120" rx="12" fill="%23334155" stroke="url(%23neon-cyan)" stroke-width="2" /><path d="M250 110 C280 110, 280 190, 250 190" fill="none" stroke="url(%23neon-cyan)" stroke-width="3" /><path d="M170 60 C170 60, 175 75, 170 80" stroke="%233b82f6" stroke-width="2" stroke-linecap="round" fill="none" /><path d="M200 55 C200 55, 205 70, 200 75" stroke="%2306b6d4" stroke-width="2" stroke-linecap="round" fill="none" /><path d="M230 60 C230 60, 235 75, 230 80" stroke="%233b82f6" stroke-width="2" stroke-linecap="round" fill="none" /><rect x="180" y="170" width="40" height="10" rx="2" fill="%2306b6d4" /><text x="187" y="178" font-family="monospace" font-size="8" fill="%230f172a" font-weight="bold">55°C</text><text x="200" y="260" font-family="sans-serif" font-weight="bold" font-size="20" fill="%23f8fafc" text-anchor="middle">Caneca Smart Termo</text></svg>`;
+const ROSH_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%"><defs><linearGradient id="rs-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%231e1e24;stop-opacity:1" /><stop offset="100%" style="stop-color:%230f0f12;stop-opacity:1" /></linearGradient><linearGradient id="gold-bowl" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:%23c5a880;stop-opacity:1" /><stop offset="100%" style="stop-color:%23785a38;stop-opacity:1" /></linearGradient></defs><rect width="400" height="300" rx="16" fill="url(%23rs-grad)" /><g stroke="url(%23gold-bowl)" stroke-linecap="round" fill="none" opacity="0.1"><line x1="50" y1="50" x2="350" y2="250" stroke-width="1" /><line x1="50" y1="250" x2="350" y2="50" stroke-width="1" /></g><g fill="none" stroke="url(%23gold-bowl)" stroke-width="2.5"><path d="M150 80 C150 80, 200 95, 250 80 C270 120, 250 140, 200 140 C150 140, 130 120, 150 80 Z" fill="url(%23gold-bowl)" stroke="%23FAF7F2" stroke-width="1.5" /><ellipse cx="200" cy="80" rx="50" ry="15" fill="%231a1a1a" stroke="url(%23gold-bowl)" stroke-width="2" /><path d="M170 140 L180 220 L220 220 L230 140 Z" fill="%23121212" stroke="url(%23gold-bowl)" stroke-width="2.5" /><rect x="175" y="220" width="50" height="15" rx="2" fill="url(%23gold-bowl)" /><circle cx="200" cy="80" r="6" fill="url(%23gold-bowl)" /><circle cx="180" cy="80" r="3" fill="url(%23gold-bowl)" /><circle cx="220" cy="80" r="3" fill="url(%23gold-bowl)" /></g><text x="200" y="260" font-family="sans-serif" font-weight="bold" font-size="18" fill="%23FAF7F2" text-anchor="middle">Rosh Cerâmica Pro Hookah</text><text x="200" y="278" font-family="sans-serif" font-size="10" fill="%23c5a880" text-anchor="middle">Queima Uniforme de Alta Performance</text></svg>`;
 
 const INITIAL_PRODUCTS: Product[] = [
   {
-    name: "Teclado Ultra Premium",
-    description: "Teclado mecânico customizado com switches lineares lubrificados de fábrica, estabilizadores premium, teclas PBT Double-shot e iluminação RGB HSL totalmente programável. Conectividade tripla (Bluetooth, 2.4Ghz e cabo USB-C).",
-    price: 1250.00,
-    category: "Periféricos",
-    stock: 12,
-    image_data: KEYBOARD_SVG
-  },
-  {
-    name: "Mouse Ergonomic Wireless",
-    description: "Mouse de alta performance com design anatômico para redução de fadiga, sensor PixArt de 26.000 DPI, cliques ópticos ultrarrápidos e bateria recarregável com autonomia de até 150 horas de jogo contínuo.",
-    price: 680.00,
-    category: "Periféricos",
-    stock: 18,
-    image_data: MOUSE_SVG
-  },
-  {
-    name: "Mochila Developer Pro",
-    description: "Mochila executiva minimalista, produzida com material balístico impermeável. Possui compartimento acolchoado suspenso para notebook de até 16 polegadas, bolsos ocultos de segurança e passagem inteligente para powerbank.",
-    price: 450.00,
-    category: "Acessórios",
-    stock: 25,
-    image_data: BACKPACK_SVG
-  },
-  {
-    name: "Caneca Smart Termo",
-    description: "Caneca de cerâmica de alta qualidade com elemento aquecedor embutido que mantém sua bebida na temperatura perfeita por até 2 horas. Controlada via display frontal ou aplicativo no smartphone. Acompanha base por indução.",
-    price: 290.00,
-    category: "Acessórios",
+    name: "Narguilé Triton Hookah Gold",
+    description: "Setup completo Triton Hookah de altíssimo luxo. Conta com stem em alumínio anodizado dourado, base de vidro soprado artesanalmente com detalhes pretos e dourados, prato usinado, mangueira de silicone lavável com piteira de alumínio e vedação perfeita.",
+    price: 890.00,
+    category: "Narguilés",
     stock: 8,
-    image_data: MUG_SVG
+    image_data: HOOKAH_SVG
+  },
+  {
+    name: "Essência Nay Secret (10 unidades)",
+    description: "Blend de tabaco Nay com sabor premium ultra refrescante e notas adocicadas misteriosas de frutas silvestres. Caixa fechada contendo 10 unidades de 50g cada, embaladas a vácuo para preservação total do melaço e do sabor.",
+    price: 120.00,
+    category: "Essências",
+    stock: 24,
+    image_data: ESSENCE_SVG
+  },
+  {
+    name: "Carvão de Coco Art Coco (1kg)",
+    description: "Carvão premium para narguilé produzido 100% a partir da casca do coco. Totalmente natural, sem cheiro, sem gosto e com mínima produção de cinzas. Garante excelente constância térmica e duração superior a 60 minutos.",
+    price: 38.00,
+    category: "Carvões",
+    stock: 50,
+    image_data: CHARCOAL_SVG
+  },
+  {
+    name: "Rosh Cerâmica Pro Hookah",
+    description: "Queimador (rosh) cerâmico esmaltado premium. Projetado com canais de fluxo de ar otimizados e parede térmica espessa para distribuir o calor do carvão de forma uniforme, prolongando a vida útil da essência e gerando fumaça densa.",
+    price: 95.00,
+    category: "Acessórios",
+    stock: 15,
+    image_data: ROSH_SVG
   }
 ];
 

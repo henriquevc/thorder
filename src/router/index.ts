@@ -11,31 +11,31 @@ const routes = [
     path: "/",
     name: "catalog",
     component: CatalogView,
-    meta: { title: "Catálogo de Produtos | Thorder" }
+    meta: { title: "Catálogo de Produtos | Tabacaria X-Smoke" }
   },
   {
     path: "/carrinho",
     name: "cart",
     component: CartView,
-    meta: { title: "Seu Carrinho | Thorder" }
+    meta: { title: "Seu Carrinho | Tabacaria X-Smoke" }
   },
   {
     path: "/checkout",
     name: "checkout",
     component: CheckoutView,
-    meta: { title: "Finalizar Pedido | Thorder" }
+    meta: { title: "Finalizar Pedido | Tabacaria X-Smoke" }
   },
   {
     path: "/pedido-confirmado/:id",
     name: "order-success",
     component: OrderSuccessView,
-    meta: { title: "Pedido Confirmado! | Thorder" }
+    meta: { title: "Pedido Confirmado! | Tabacaria X-Smoke" }
   },
   {
     path: "/admin/login",
     name: "admin-login",
     component: LoginView,
-    meta: { title: "Acesso Administrativo | Thorder" }
+    meta: { title: "Acesso Administrativo | Tabacaria X-Smoke" }
   },
   {
     path: "/admin",
@@ -43,7 +43,7 @@ const routes = [
     component: AdminDashboard,
     meta: { 
       requiresAuth: true,
-      title: "Painel Administrativo | Thorder" 
+      title: "Painel Administrativo | Tabacaria X-Smoke" 
     }
   },
   // Redireciona qualquer rota inválida para o catálogo

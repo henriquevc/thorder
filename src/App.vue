@@ -72,12 +72,12 @@ const handleAdminLogout = () => {
         <div class="flex items-center gap-8">
           <router-link to="/" class="flex items-center gap-2 group">
             <div class="w-9 h-9 rounded-xl bg-linear-to-tr from-brand-start to-brand-end flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-all duration-300">
-              <span class="text-white font-black text-lg">T</span>
+              <span class="text-white font-black text-lg">X</span>
             </div>
             <span class="font-extrabold text-xl tracking-tight transition-colors duration-200"
               :class="themeMode === 'dark' ? 'text-white group-hover:text-primary' : 'text-slate-900 group-hover:text-primary'"
             >
-              Thorder<span class="text-primary">Store</span>
+              X-Smoke<span class="text-primary">Tabacaria</span>
             </span>
           </router-link>
 
@@ -304,7 +304,7 @@ const handleAdminLogout = () => {
         <p class="text-sm font-semibold tracking-wide"
           :class="themeMode === 'dark' ? 'bg-gradient-to-r from-slate-200 to-slate-400 bg-clip-text text-transparent' : 'text-slate-700'"
         >
-          ThorderStore &copy; 2026 - Conectividade Híbrida Turso DB
+          Tabacaria X-Smoke &copy; 2026 - Conectividade Híbrida Turso DB
         </p>
       </div>
     </footer>

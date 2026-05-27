@@ -13,6 +13,7 @@ import {
   getCart, 
   clearCart, 
   createOrder, 
+  checkStoreOpen,
   type CartItem, 
   type ShippingOption 
 } from '@/services/store'
@@ -22,6 +23,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 const router = useRouter()
 const cartItems = ref<CartItem[]>([])
+
+// Status de Funcionamento da Loja
+const isStoreOpen = ref(true)
+const storeOpenTime = ref('18:00')
+const storeCloseTime = ref('23:59')
 
 // Dados do Cliente
 const customerName = ref('')
@@ -106,13 +112,23 @@ const lookupCep = async (cep: string) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   cartItems.value = getCart()
   
   // Se o carrinho estiver vazio, manda de volta
   if (cartItems.value.length === 0) {
     router.push('/carrinho')
     return
+  }
+
+  // Verifica se a loja está aberta
+  try {
+    const status = await checkStoreOpen()
+    isStoreOpen.value = status.isOpen
+    storeOpenTime.value = status.openTime
+    storeCloseTime.value = status.closeTime
+  } catch (e) {
+    console.error('Erro ao verificar horário de funcionamento:', e)
   }
 
   // Pega frete selecionado do sessionStorage
@@ -154,6 +170,12 @@ const formatPrice = (value: number) => {
 
 // Lógica de Validação e Envio
 const handleSubmitOrder = async () => {
+  // Valida horário de funcionamento
+  if (!isStoreOpen.value) {
+    submitError.value = `Não é possível finalizar pedidos fora do horário de funcionamento (${storeOpenTime.value} às ${storeCloseTime.value}).`
+    return
+  }
+
   // Valida campos básicos
   if (!customerName.value || !customerPhone.value) {
     submitError.value = 'Por favor, preencha todos os dados de contato.'
@@ -238,6 +260,17 @@ const handleSubmitOrder = async () => {
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar ao carrinho
       </router-link>
+    </div>
+
+    <!-- Aviso de Loja Fechada -->
+    <div v-if="!isStoreOpen" class="p-4.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-start gap-3 animate-in fade-in duration-300">
+      <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
+      <div>
+        <h4 class="font-extrabold text-sm text-amber-600">Loja Fechada no Momento</h4>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Nosso horário de funcionamento é das <strong>{{ storeOpenTime }}</strong> às <strong>{{ storeCloseTime }}</strong>. Você não conseguirá finalizar sua compra no momento. Agradecemos a sua compreensão!
+        </p>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -449,7 +482,7 @@ const handleSubmitOrder = async () => {
             <!-- Botão de Finalizar -->
             <Button 
               class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5 shadow-lg shadow-primary/20 flex items-center justify-center gap-1.5"
-              :disabled="isSubmitting"
+              :disabled="isSubmitting || !isStoreOpen"
               @click="handleSubmitOrder"
             >
               <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin mr-1" />

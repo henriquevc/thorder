@@ -703,3 +703,33 @@ export async function calculateShipping(cep: string): Promise<ShippingOption[]> 
     ];
   }
 }
+
+export async function checkStoreOpen(): Promise<{ isOpen: boolean; openTime: string; closeTime: string; isEnabled: boolean }> {
+  const isEnabledStr = await fetchSetting('store_hours_enabled', 'false');
+  const openTime = await fetchSetting('store_open_time', '18:00');
+  const closeTime = await fetchSetting('store_close_time', '23:59');
+  
+  const isEnabled = isEnabledStr === 'true';
+  if (!isEnabled) {
+    return { isOpen: true, openTime, closeTime, isEnabled };
+  }
+  
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const currentTimeInMinutes = currentHours * 60 + currentMinutes;
+  
+  const [openH, openM] = openTime.split(':').map(Number);
+  const [closeH, closeM] = closeTime.split(':').map(Number);
+  const openTimeInMinutes = openH * 60 + openM;
+  const closeTimeInMinutes = closeH * 60 + closeM;
+  
+  let isOpen = false;
+  if (closeTimeInMinutes >= openTimeInMinutes) {
+    isOpen = currentTimeInMinutes >= openTimeInMinutes && currentTimeInMinutes <= closeTimeInMinutes;
+  } else {
+    isOpen = currentTimeInMinutes >= openTimeInMinutes || currentTimeInMinutes <= closeTimeInMinutes;
+  }
+  
+  return { isOpen, openTime, closeTime, isEnabled };
+}

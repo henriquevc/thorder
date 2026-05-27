@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   AlertCircle,
   Palette,
-  MapPin
+  MapPin,
+  Clock
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -53,6 +54,14 @@ const storeWhatsapp = ref('')
 const isSavingAddress = ref(false)
 const saveAddressSuccess = ref(false)
 const saveAddressError = ref('')
+
+// Configurações do Horário de Funcionamento
+const storeHoursEnabled = ref(false)
+const storeOpenTime = ref('18:00')
+const storeCloseTime = ref('23:59')
+const isSavingHours = ref(false)
+const saveHoursSuccess = ref(false)
+const saveHoursError = ref('')
 
 // Carrega as credenciais existentes se houver
 const currentConfig = getTursoConfig()
@@ -141,19 +150,54 @@ const handleSaveSettings = async () => {
   }
 }
 
+// Salvar Configurações do Horário de Funcionamento
+const handleSaveHours = async () => {
+  if (!storeOpenTime.value || !storeCloseTime.value) {
+    saveHoursError.value = 'Os horários de abertura e fechamento não podem ser vazios.'
+    return
+  }
+  
+  isSavingHours.value = true
+  saveHoursError.value = ''
+  saveHoursSuccess.value = false
+  
+  try {
+    await Promise.all([
+      saveSetting('store_hours_enabled', storeHoursEnabled.value ? 'true' : 'false'),
+      saveSetting('store_open_time', storeOpenTime.value),
+      saveSetting('store_close_time', storeCloseTime.value)
+    ])
+    
+    saveHoursSuccess.value = true
+    setTimeout(() => {
+      saveHoursSuccess.value = false
+    }, 2000)
+  } catch (e: any) {
+    saveHoursError.value = e.message || 'Falha ao salvar o horário de funcionamento no banco de dados.'
+  } finally {
+    isSavingHours.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     // Carrega estatísticas iniciais em paralelo
-    const [orders, products, address, whatsapp] = await Promise.all([
+    const [orders, products, address, whatsapp, hoursEnabled, openTime, closeTime] = await Promise.all([
       fetchOrders(),
       fetchProducts(),
       fetchSetting('store_address', 'Rua Marechal Deodoro, 150 - Centro, Cajuru - SP'),
-      fetchSetting('store_whatsapp', '5516999999999')
+      fetchSetting('store_whatsapp', '5516999999999'),
+      fetchSetting('store_hours_enabled', 'false'),
+      fetchSetting('store_open_time', '18:00'),
+      fetchSetting('store_close_time', '23:59')
     ])
     ordersList.value = orders
     productsList.value = products
     storeAddress.value = address
     storeWhatsapp.value = whatsapp
+    storeHoursEnabled.value = hoursEnabled === 'true'
+    storeOpenTime.value = openTime
+    storeCloseTime.value = closeTime
   } catch (err) {
     console.error('Falha ao obter dados estatísticos:', err)
   } finally {
@@ -483,6 +527,102 @@ const formatPrice = (val: number) => {
               >
                 <Loader2 v-if="isSavingAddress" class="w-4 h-4 animate-spin mr-1.5" />
                 {{ isSavingAddress ? 'Salvando...' : 'Salvar Configurações' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- HORÁRIO DE FUNCIONAMENTO -->
+        <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
+          :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
+        >
+          <CardHeader class="border-b pb-4" :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'">
+            <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+              :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+            >
+              <Clock class="w-5 h-5 text-primary" />
+              Horário de Funcionamento
+            </CardTitle>
+            <p class="text-slate-400 text-xs mt-1">
+              Defina os horários diários em que a loja está aberta para receber pedidos. Se a restrição estiver ativa, os clientes não poderão finalizar compras fora do intervalo especificado.
+            </p>
+          </CardHeader>
+          
+          <CardContent class="p-6 space-y-5">
+            <!-- Checkbox de Habilitação -->
+            <div class="flex items-center gap-3 p-3 rounded-xl border"
+              :class="themeMode === 'dark' ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'"
+            >
+              <input 
+                id="hours-enabled-checkbox"
+                v-model="storeHoursEnabled" 
+                type="checkbox"
+                class="w-4.5 h-4.5 text-primary rounded border-slate-300 focus:ring-primary focus:ring-opacity-50 cursor-pointer"
+              />
+              <label for="hours-enabled-checkbox" class="text-xs font-bold select-none cursor-pointer flex-1"
+                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
+              >
+                Habilitar limite de horário de funcionamento
+              </label>
+            </div>
+
+            <!-- Seletores de Horário (Abertura e Fechamento) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6" :class="{ 'opacity-60 pointer-events-none': !storeHoursEnabled }">
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                  :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                >Horário de Abertura</label>
+                <Input 
+                  v-model="storeOpenTime" 
+                  type="time" 
+                  class="rounded-xl w-full"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
+                />
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                  :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                >Horário de Fechamento</label>
+                <Input 
+                  v-model="storeCloseTime" 
+                  type="time" 
+                  class="rounded-xl w-full"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
+                />
+              </div>
+            </div>
+
+            <!-- Informação Informativa de Virada de Noite -->
+            <p v-if="storeHoursEnabled" class="text-[10px] leading-relaxed italic text-slate-550"
+              :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+            >
+              * O sistema é compatível com turnos noturnos. Por exemplo, se definir abertura às <strong>18:00</strong> e fechamento às <strong>02:00</strong>, a loja ficará aberta das 18:00 até as 23:59 e de 00:00 até as 02:00.
+            </p>
+
+            <!-- Feedbacks -->
+            <div v-if="saveHoursError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              <span>{{ saveHoursError }}</span>
+            </div>
+
+            <div v-if="saveHoursSuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
+              <Check class="w-4 h-4 shrink-0" />
+              <span>Horário de funcionamento salvo com sucesso no banco de dados!</span>
+            </div>
+
+            <!-- Ações -->
+            <div class="flex justify-end pt-2 border-t"
+              :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-150'"
+            >
+              <Button 
+                size="sm"
+                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                :disabled="isSavingHours"
+                @click="handleSaveHours"
+              >
+                <Loader2 v-if="isSavingHours" class="w-4 h-4 animate-spin mr-1.5" />
+                {{ isSavingHours ? 'Salvando...' : 'Salvar Horário' }}
               </Button>
             </div>
           </CardContent>

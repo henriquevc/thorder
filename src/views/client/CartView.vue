@@ -16,6 +16,7 @@ import {
   getCart, 
   saveCart, 
   calculateShipping, 
+  checkStoreOpen,
   type CartItem, 
   type ShippingOption 
 } from '@/services/store'
@@ -25,6 +26,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 const router = useRouter()
 const cartItems = ref<CartItem[]>([])
+
+// Status de Funcionamento da Loja
+const isStoreOpen = ref(true)
+const storeOpenTime = ref('18:00')
+const storeCloseTime = ref('23:59')
 
 // Cálculo de Frete
 const cepInput = ref('')
@@ -46,8 +52,18 @@ watch(cepInput, (newVal) => {
   cepInput.value = formatCEP(newVal)
 })
 
-onMounted(() => {
+onMounted(async () => {
   cartItems.value = getCart()
+  
+  // Verifica se a loja está aberta
+  try {
+    const status = await checkStoreOpen()
+    isStoreOpen.value = status.isOpen
+    storeOpenTime.value = status.openTime
+    storeCloseTime.value = status.closeTime
+  } catch (e) {
+    console.error('Erro ao verificar horário de funcionamento:', e)
+  }
   
   // Se já havia um frete calculado persistido no sessionStorage, recupera
   const cachedShipping = sessionStorage.getItem('selected_shipping')
@@ -169,6 +185,7 @@ const handleSelectShipping = (option: ShippingOption) => {
 
 // Direcionar para Checkout
 const handleGoToCheckout = () => {
+  if (!isStoreOpen.value) return
   if (cartItems.value.length === 0) return
   if (!selectedShipping.value) {
     shippingError.value = 'Por favor, calcule e selecione uma opção de frete antes de finalizar.'
@@ -197,6 +214,17 @@ const handleGoToCheckout = () => {
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar à loja
       </router-link>
+    </div>
+
+    <!-- Aviso de Loja Fechada -->
+    <div v-if="!isStoreOpen" class="p-4.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-start gap-3 animate-in fade-in duration-300">
+      <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
+      <div>
+        <h4 class="font-extrabold text-sm text-amber-600">Loja Fechada no Momento</h4>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          Nosso horário de funcionamento é das <strong>{{ storeOpenTime }}</strong> às <strong>{{ storeCloseTime }}</strong>. Você ainda pode gerenciar seu carrinho, mas o checkout e a finalização de novos pedidos estão temporariamente bloqueados. Agradecemos a sua compreensão!
+        </p>
+      </div>
     </div>
 
     <!-- Carrinho Vazio -->
@@ -398,6 +426,7 @@ const handleGoToCheckout = () => {
             <!-- Botão de Ação -->
             <Button 
               class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5 shadow-lg shadow-primary/20 flex items-center justify-center gap-1 group"
+              :disabled="!isStoreOpen"
               @click="handleGoToCheckout"
             >
               <span>Prosseguir para Checkout</span>

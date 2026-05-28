@@ -42,7 +42,7 @@ const customerPhone = ref('')
 // Formas de Pagamento
 const paymentMethod = ref<'pix' | 'cartao' | 'dinheiro'>('pix')
 const needsChange = ref(false)
-const changeFor = ref<number | null>(null)
+const changeFor = ref<number | undefined>(undefined)
 
 // Dados do Endereço
 const shippingCep = ref('')

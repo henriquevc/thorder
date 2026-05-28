@@ -7,15 +7,20 @@ import {
   ArrowLeft, 
   Loader2, 
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  DollarSign,
+  Coins
 } from 'lucide-vue-next'
 import { 
   getCart, 
   clearCart, 
   createOrder, 
   checkStoreOpen,
+  validateCoupon,
   type CartItem, 
-  type ShippingOption 
+  type ShippingOption,
+  type Coupon
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +39,11 @@ const customerName = ref('')
 const customerEmail = ref('')
 const customerPhone = ref('')
 
+// Formas de Pagamento
+const paymentMethod = ref<'pix' | 'cartao' | 'dinheiro'>('pix')
+const needsChange = ref(false)
+const changeFor = ref<number | null>(null)
+
 // Dados do Endereço
 const shippingCep = ref('')
 const addressStreet = ref('')
@@ -45,6 +55,14 @@ const addressState = ref('')
 
 // Frete Selecionado
 const selectedShipping = ref<ShippingOption | null>(null)
+
+// Cupons de Desconto
+const couponCode = ref('')
+const isApplyingCoupon = ref(false)
+const couponError = ref('')
+const couponSuccess = ref('')
+const appliedCoupon = ref<Coupon | null>(null)
+const discountAmount = ref(0)
 
 // Helpers de formatação e máscaras
 const formatCEP = (value: string) => {
@@ -158,7 +176,7 @@ const shippingCost = computed(() => {
 })
 
 const totalCost = computed(() => {
-  return itemsCost.value + shippingCost.value
+  return Math.max(0, itemsCost.value - discountAmount.value) + shippingCost.value
 })
 
 const formatPrice = (value: number) => {
@@ -166,6 +184,58 @@ const formatPrice = (value: number) => {
     style: 'currency',
     currency: 'BRL'
   }).format(value)
+}
+
+// Lógica de Cupom de Desconto
+const handleApplyCoupon = async () => {
+  const code = couponCode.value.toUpperCase().trim()
+  if (!code) {
+    couponError.value = 'Digite o código do cupom.'
+    couponSuccess.value = ''
+    return
+  }
+
+  isApplyingCoupon.value = true
+  couponError.value = ''
+  couponSuccess.value = ''
+
+  setTimeout(async () => {
+    try {
+      const result = await validateCoupon(code, itemsCost.value)
+      if (result.valid && result.coupon) {
+        appliedCoupon.value = result.coupon
+        
+        // Calcula desconto
+        if (result.coupon.discount_type === 'percentage') {
+          const calcDiscount = itemsCost.value * (result.coupon.discount_value / 100)
+          discountAmount.value = Math.min(calcDiscount, itemsCost.value)
+        } else {
+          discountAmount.value = Math.min(result.coupon.discount_value, itemsCost.value)
+        }
+        
+        couponSuccess.value = `Cupom ${result.coupon.code} aplicado com sucesso!`
+        couponError.value = ''
+      } else {
+        couponError.value = result.error || 'Falha ao validar cupom.'
+        appliedCoupon.value = null
+        discountAmount.value = 0
+      }
+    } catch (err: any) {
+      couponError.value = 'Falha técnica ao validar cupom.'
+      appliedCoupon.value = null
+      discountAmount.value = 0
+    } finally {
+      isApplyingCoupon.value = false
+    }
+  }, 500)
+}
+
+const handleRemoveCoupon = () => {
+  appliedCoupon.value = null
+  discountAmount.value = 0
+  couponCode.value = ''
+  couponSuccess.value = ''
+  couponError.value = ''
 }
 
 // Lógica de Validação e Envio
@@ -193,6 +263,14 @@ const handleSubmitOrder = async () => {
     return
   }
 
+  // Validação de troco para dinheiro
+  if (paymentMethod.value === 'dinheiro' && needsChange.value) {
+    if (!changeFor.value || changeFor.value <= totalCost.value) {
+      submitError.value = `O valor para troco deve ser maior que o valor total da compra (${formatPrice(totalCost.value)}).`
+      return
+    }
+  }
+
   isSubmitting.value = true
   submitError.value = ''
 
@@ -213,7 +291,11 @@ const handleSubmitOrder = async () => {
       items_cost: itemsCost.value,
       total_cost: totalCost.value,
       status: 'Pendente' as const,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      coupon_code: appliedCoupon.value ? appliedCoupon.value.code : undefined,
+      discount_amount: discountAmount.value,
+      payment_method: paymentMethod.value,
+      change_amount: (paymentMethod.value === 'dinheiro' && needsChange.value) ? Number(changeFor.value) : 0
     }
     
     // Mapeia itens do carrinho
@@ -415,6 +497,121 @@ const handleSubmitOrder = async () => {
             </div>
           </CardContent>
         </Card>
+
+        <!-- 3. Forma de Pagamento -->
+        <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <CardHeader class="pb-3 border-b border-slate-100">
+            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">3</span>
+              Forma de Pagamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent class="p-6 space-y-5">
+            <!-- Grid de Seleção de Pagamento -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <!-- Opção Pix -->
+              <button 
+                type="button"
+                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                :class="paymentMethod === 'pix' 
+                  ? 'border-primary bg-primary/5 text-primary shadow-sm' 
+                  : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
+                @click="paymentMethod = 'pix'"
+              >
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  :class="paymentMethod === 'pix' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
+                >
+                  <QrCode class="w-5 h-5" />
+                </div>
+                <div class="space-y-0.5">
+                  <span class="text-xs font-bold block">Pix</span>
+                  <span class="text-[9px] text-slate-400 block font-medium">QR Code na tela</span>
+                </div>
+              </button>
+
+              <!-- Opção Cartão -->
+              <button 
+                type="button"
+                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                :class="paymentMethod === 'cartao' 
+                  ? 'border-primary bg-primary/5 text-primary shadow-sm' 
+                  : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
+                @click="paymentMethod = 'cartao'"
+              >
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  :class="paymentMethod === 'cartao' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
+                >
+                  <CreditCard class="w-5 h-5" />
+                </div>
+                <div class="space-y-0.5">
+                  <span class="text-xs font-bold block">Cartão</span>
+                  <span class="text-[9px] text-slate-400 block font-medium">Maquininha na Entrega</span>
+                </div>
+              </button>
+
+              <!-- Opção Dinheiro -->
+              <button 
+                type="button"
+                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                :class="paymentMethod === 'dinheiro' 
+                  ? 'border-primary bg-primary/5 text-primary shadow-sm' 
+                  : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
+                @click="paymentMethod = 'dinheiro'"
+              >
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                  :class="paymentMethod === 'dinheiro' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
+                >
+                  <Coins class="w-5 h-5" />
+                </div>
+                <div class="space-y-0.5">
+                  <span class="text-xs font-bold block">Dinheiro</span>
+                  <span class="text-[9px] text-slate-400 block font-medium">Pagar na Entrega/Retirada</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Opções Condicionais de Dinheiro (Troco) -->
+            <div 
+              v-if="paymentMethod === 'dinheiro'" 
+              class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300"
+            >
+              <div class="flex items-center gap-2.5 cursor-pointer select-none">
+                <input 
+                  id="needs-change-checkbox"
+                  v-model="needsChange"
+                  type="checkbox"
+                  class="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary cursor-pointer"
+                />
+                <label for="needs-change-checkbox" class="text-xs font-bold text-slate-650 cursor-pointer flex-1">
+                  Preciso de troco
+                </label>
+              </div>
+
+              <!-- Input de valor de troco -->
+              <div 
+                v-if="needsChange" 
+                class="space-y-1.5 pt-1 max-w-xs animate-in fade-in slide-in-from-top-1 duration-200"
+              >
+                <label class="text-[10px] uppercase font-bold text-slate-450 tracking-wider">Troco para quanto?</label>
+                <div class="relative rounded-xl shadow-xs">
+                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <span class="text-xs text-slate-400 font-bold">R$</span>
+                  </div>
+                  <Input 
+                    v-model.number="changeFor"
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 100.00"
+                    class="bg-white border-slate-350 text-slate-900 text-xs rounded-xl pl-9 focus-visible:ring-primary font-bold"
+                  />
+                </div>
+                <p class="text-[9px] text-slate-450">
+                  Preencha o valor em dinheiro com o qual vai pagar. Nós calcularemos o troco automaticamente.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <!-- Resumo e Ação (1 Coluna) -->
@@ -449,6 +646,54 @@ const handleSubmitOrder = async () => {
               </div>
             </div>
 
+            <!-- Seção de Cupom de Desconto -->
+            <div class="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Cupom de Desconto</span>
+              
+              <div v-if="!appliedCoupon" class="flex gap-2">
+                <Input 
+                  v-model="couponCode"
+                  placeholder="Ex: BEMVINDO10"
+                  class="bg-white border-slate-300 text-slate-900 text-xs placeholder:text-slate-400 rounded-lg h-9 focus-visible:ring-primary uppercase font-bold"
+                  @keyup.enter="handleApplyCoupon"
+                  :disabled="isApplyingCoupon"
+                />
+                <Button 
+                  size="sm"
+                  class="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-9 shrink-0 text-xs px-4"
+                  :disabled="isApplyingCoupon"
+                  @click="handleApplyCoupon"
+                >
+                  <Loader2 v-if="isApplyingCoupon" class="w-3.5 h-3.5 animate-spin" />
+                  <span v-else>Aplicar</span>
+                </Button>
+              </div>
+              
+              <!-- Cupom Aplicado -->
+              <div v-else class="flex items-center justify-between bg-emerald-50 border border-emerald-250 p-2.5 rounded-lg text-xs">
+                <div class="flex items-center gap-1.5 font-semibold text-emerald-700">
+                  <CheckCircle class="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>Cupom: <strong class="font-black text-emerald-850">{{ appliedCoupon.code }}</strong></span>
+                </div>
+                <button 
+                  class="text-xs text-red-500 hover:text-red-700 font-bold px-1 cursor-pointer transition-colors"
+                  @click="handleRemoveCoupon"
+                >
+                  Remover
+                </button>
+              </div>
+
+              <!-- Mensagens de Feedback -->
+              <div v-if="couponError" class="text-[10px] text-red-500 font-semibold flex items-center gap-1 mt-1 animate-shake">
+                <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-red-500" />
+                <span>{{ couponError }}</span>
+              </div>
+              <div v-if="couponSuccess" class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                <CheckCircle class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <span>{{ couponSuccess }}</span>
+              </div>
+            </div>
+
             <!-- Divisor -->
             <div class="border-t border-slate-100 my-2"></div>
 
@@ -458,6 +703,13 @@ const handleSubmitOrder = async () => {
                 <span>Subtotal Itens</span>
                 <span class="font-semibold text-slate-750">{{ formatPrice(itemsCost) }}</span>
               </div>
+
+              <!-- Linha de Desconto do Cupom -->
+              <div v-if="appliedCoupon" class="flex justify-between text-red-600 font-medium">
+                <span>Desconto (Cupom: {{ appliedCoupon.code }})</span>
+                <span class="font-bold">- {{ formatPrice(discountAmount) }}</span>
+              </div>
+
               <div class="flex justify-between text-slate-500">
                 <span>Taxa de Entrega</span>
                 <span class="font-semibold text-slate-750">{{ formatPrice(shippingCost) }}</span>

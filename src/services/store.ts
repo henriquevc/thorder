@@ -33,6 +33,10 @@ export interface Order {
   status: 'Pendente' | 'Pago' | 'Enviado' | 'Entregue';
   created_at: string;
   items?: OrderItem[];
+  coupon_code?: string;
+  discount_amount?: number;
+  payment_method?: 'pix' | 'cartao' | 'dinheiro';
+  change_amount?: number;
 }
 
 // Interface para Itens de Pedido
@@ -240,7 +244,11 @@ async function initializeTables(client: any) {
       items_cost REAL,
       total_cost REAL,
       status TEXT,
-      created_at TEXT
+      created_at TEXT,
+      coupon_code TEXT,
+      discount_amount REAL DEFAULT 0,
+      payment_method TEXT,
+      change_amount REAL DEFAULT 0
     )`,
     `CREATE TABLE IF NOT EXISTS order_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -253,8 +261,33 @@ async function initializeTables(client: any) {
     `CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE,
+      discount_type TEXT,
+      discount_value REAL,
+      min_purchase_cost REAL DEFAULT 0,
+      expiration_date TEXT,
+      limit_uses INTEGER,
+      used_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1
     )`
   ], "write");
+
+  // Retrocompatibilidade: tenta adicionar colunas se a tabela orders já existir sem elas
+  try {
+    await client.execute("ALTER TABLE orders ADD COLUMN coupon_code TEXT");
+  } catch (e) {}
+  try {
+    await client.execute("ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0");
+  } catch (e) {}
+  try {
+    await client.execute("ALTER TABLE orders ADD COLUMN payment_method TEXT");
+  } catch (e) {}
+  try {
+    await client.execute("ALTER TABLE orders ADD COLUMN change_amount REAL DEFAULT 0");
+  } catch (e) {}
 }
 
 // Migrar dados do localStorage para o Turso (rodado apenas uma vez se o Turso estiver sem produtos)
@@ -281,6 +314,43 @@ async function migrateLocalDataToTurso(client: any) {
     if (statements.length > 0) {
       await client.batch(statements, "write");
     }
+  }
+
+  // Migrar cupons se o Turso estiver sem cupons
+  try {
+    const couponTest = await client.execute("SELECT COUNT(*) as count FROM coupons");
+    const couponCount = couponTest.rows[0]?.count || 0;
+    
+    if (Number(couponCount) === 0) {
+      let localCoupons = INITIAL_COUPONS;
+      const storedCoupons = localStorage.getItem(LOCAL_COUPONS_KEY);
+      if (storedCoupons) {
+        try {
+          localCoupons = JSON.parse(storedCoupons);
+        } catch (e) {}
+      }
+      
+      const statements = localCoupons.map(c => ({
+        sql: `INSERT INTO coupons (code, discount_type, discount_value, min_purchase_cost, expiration_date, limit_uses, used_count, is_active) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          c.code.toUpperCase().trim(),
+          c.discount_type,
+          c.discount_value,
+          c.min_purchase_cost ?? 0,
+          c.expiration_date ?? null,
+          c.limit_uses ?? null,
+          c.used_count ?? 0,
+          c.is_active ? 1 : 0
+        ]
+      }));
+      
+      if (statements.length > 0) {
+        await client.batch(statements, "write");
+      }
+    }
+  } catch (e) {
+    console.error("Erro ao migrar cupons para o Turso:", e);
   }
 }
 
@@ -441,6 +511,10 @@ export async function fetchOrders(): Promise<Order[]> {
         total_cost: Number(row.total_cost),
         status: row.status as Order["status"],
         created_at: String(row.created_at),
+        coupon_code: row.coupon_code ? String(row.coupon_code) : undefined,
+        discount_amount: row.discount_amount !== null ? Number(row.discount_amount) : undefined,
+        payment_method: row.payment_method ? String(row.payment_method) as any : undefined,
+        change_amount: row.change_amount !== null ? Number(row.change_amount) : undefined,
         items: []
       }));
       
@@ -490,8 +564,8 @@ export async function createOrder(order: Omit<Order, "id" | "items">, items: Omi
     try {
       // Inserção no Turso dentro de uma transação batch
       const orderInsertRes = await client.execute({
-        sql: `INSERT INTO orders (customer_name, customer_email, customer_phone, shipping_cep, shipping_address, shipping_carrier, shipping_cost, items_cost, total_cost, status, created_at) 
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        sql: `INSERT INTO orders (customer_name, customer_email, customer_phone, shipping_cep, shipping_address, shipping_carrier, shipping_cost, items_cost, total_cost, status, created_at, coupon_code, discount_amount, payment_method, change_amount) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         args: [
           order.customer_name,
           order.customer_email ?? null,
@@ -503,7 +577,11 @@ export async function createOrder(order: Omit<Order, "id" | "items">, items: Omi
           order.items_cost,
           order.total_cost,
           order.status,
-          order.created_at
+          order.created_at,
+          order.coupon_code ?? null,
+          order.discount_amount ?? 0,
+          order.payment_method ?? 'pix',
+          order.change_amount ?? 0
         ]
       });
       
@@ -525,6 +603,11 @@ export async function createOrder(order: Omit<Order, "id" | "items">, items: Omi
       
       if (batchCommands.length > 0) {
         await client.batch(batchCommands, "write");
+      }
+
+      // Incrementa uso do cupom se houver
+      if (order.coupon_code) {
+        await incrementCouponUses(order.coupon_code);
       }
       
       return newOrderId;
@@ -559,6 +642,11 @@ export async function createOrder(order: Omit<Order, "id" | "items">, items: Omi
     }
   }
   localStorage.setItem(LOCAL_PRODUCTS_KEY, JSON.stringify(localProducts));
+
+  // Incrementa uso do cupom se houver
+  if (order.coupon_code) {
+    await incrementCouponUses(order.coupon_code);
+  }
   
   return newOrderId;
 }
@@ -732,4 +820,249 @@ export async function checkStoreOpen(): Promise<{ isOpen: boolean; openTime: str
   }
   
   return { isOpen, openTime, closeTime, isEnabled };
+}
+
+/* ==========================================
+   CRUD E VALIDAÇÃO DE CUPONS DE DESCONTO
+   ========================================== */
+
+export interface Coupon {
+  id?: number;
+  code: string;
+  discount_type: 'fixed' | 'percentage';
+  discount_value: number;
+  min_purchase_cost?: number;
+  expiration_date?: string; // Formato YYYY-MM-DD
+  limit_uses?: number;
+  used_count: number;
+  is_active: boolean;
+}
+
+const LOCAL_COUPONS_KEY = "thorder_local_coupons";
+
+const INITIAL_COUPONS: Coupon[] = [
+  {
+    code: "BEMVINDO10",
+    discount_type: "percentage",
+    discount_value: 10,
+    min_purchase_cost: 50.00,
+    used_count: 0,
+    is_active: true
+  },
+  {
+    code: "FUMA15",
+    discount_type: "fixed",
+    discount_value: 15.00,
+    min_purchase_cost: 100.00,
+    used_count: 0,
+    is_active: true
+  },
+  {
+    code: "VIP30",
+    discount_type: "percentage",
+    discount_value: 30,
+    min_purchase_cost: 200.00,
+    used_count: 0,
+    is_active: true
+  }
+];
+
+export async function fetchCoupons(): Promise<Coupon[]> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      const res = await client.execute("SELECT * FROM coupons ORDER BY code ASC");
+      return res.rows.map((row: any) => ({
+        id: Number(row.id),
+        code: String(row.code),
+        discount_type: row.discount_type as Coupon["discount_type"],
+        discount_value: Number(row.discount_value),
+        min_purchase_cost: row.min_purchase_cost !== null ? Number(row.min_purchase_cost) : undefined,
+        expiration_date: row.expiration_date !== null && row.expiration_date !== '' ? String(row.expiration_date) : undefined,
+        limit_uses: row.limit_uses !== null && row.limit_uses !== '' ? Number(row.limit_uses) : undefined,
+        used_count: Number(row.used_count),
+        is_active: Number(row.is_active) === 1
+      }));
+    } catch (e) {
+      console.error("Falha ao buscar cupons no Turso, usando fallback local", e);
+    }
+  }
+
+  // Fallback Local Storage
+  const stored = localStorage.getItem(LOCAL_COUPONS_KEY);
+  if (!stored) {
+    localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(INITIAL_COUPONS));
+    return INITIAL_COUPONS.map((c, idx) => ({ ...c, id: idx + 1 }));
+  }
+  try {
+    const list: Coupon[] = JSON.parse(stored);
+    return list;
+  } catch (e) {
+    return INITIAL_COUPONS.map((c, idx) => ({ ...c, id: idx + 1 }));
+  }
+}
+
+export async function createCoupon(coupon: Omit<Coupon, "id">): Promise<Coupon> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      const res = await client.execute({
+        sql: `INSERT INTO coupons (code, discount_type, discount_value, min_purchase_cost, expiration_date, limit_uses, used_count, is_active) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        args: [
+          coupon.code.toUpperCase().trim(),
+          coupon.discount_type,
+          coupon.discount_value,
+          coupon.min_purchase_cost ?? 0,
+          coupon.expiration_date ?? null,
+          coupon.limit_uses ?? null,
+          coupon.used_count ?? 0,
+          coupon.is_active ? 1 : 0
+        ]
+      });
+      const newId = Number(res.rows[0]?.id);
+      return { ...coupon, id: newId };
+    } catch (e) {
+      console.error("Falha ao inserir cupom no Turso, inserindo local", e);
+    }
+  }
+
+  // Fallback Local Storage
+  const coupons = await fetchCoupons();
+  const newId = coupons.length > 0 ? Math.max(...coupons.map(c => c.id || 0)) + 1 : 1;
+  const newCoupon = { 
+    ...coupon, 
+    id: newId, 
+    code: coupon.code.toUpperCase().trim() 
+  };
+  coupons.push(newCoupon);
+  localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(coupons));
+  return newCoupon;
+}
+
+export async function updateCoupon(coupon: Coupon): Promise<void> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      await client.execute({
+        sql: `UPDATE coupons 
+              SET code = ?, discount_type = ?, discount_value = ?, min_purchase_cost = ?, expiration_date = ?, limit_uses = ?, used_count = ?, is_active = ? 
+              WHERE id = ?`,
+        args: [
+          coupon.code.toUpperCase().trim(),
+          coupon.discount_type,
+          coupon.discount_value,
+          coupon.min_purchase_cost ?? 0,
+          coupon.expiration_date ?? null,
+          coupon.limit_uses ?? null,
+          coupon.used_count,
+          coupon.is_active ? 1 : 0,
+          coupon.id!
+        ]
+      });
+      return;
+    } catch (e) {
+      console.error("Falha ao atualizar cupom no Turso, atualizando local", e);
+    }
+  }
+
+  // Fallback Local Storage
+  const coupons = await fetchCoupons();
+  const idx = coupons.findIndex(c => c.id === coupon.id);
+  if (idx !== -1) {
+    coupons[idx] = {
+      ...coupon,
+      code: coupon.code.toUpperCase().trim()
+    };
+    localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(coupons));
+  }
+}
+
+export async function deleteCoupon(couponId: number): Promise<void> {
+  const client = getDbClient();
+  if (client) {
+    try {
+      await client.execute({
+        sql: "DELETE FROM coupons WHERE id = ?",
+        args: [couponId]
+      });
+      return;
+    } catch (e) {
+      console.error("Falha ao deletar cupom no Turso, deletando local", e);
+    }
+  }
+
+  // Fallback Local Storage
+  let coupons = await fetchCoupons();
+  coupons = coupons.filter(c => c.id !== couponId);
+  localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(coupons));
+}
+
+export async function validateCoupon(code: string, cartTotal: number): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> {
+  const cleanCode = code.toUpperCase().trim();
+  if (!cleanCode) {
+    return { valid: false, error: "Código do cupom não pode ser vazio." };
+  }
+
+  const coupons = await fetchCoupons();
+  const found = coupons.find(c => c.code === cleanCode);
+
+  if (!found) {
+    return { valid: false, error: "Cupom não encontrado ou inválido." };
+  }
+
+  if (!found.is_active) {
+    return { valid: false, error: "Este cupom foi desativado." };
+  }
+
+  // Validação do Limite de Usos
+  if (found.limit_uses !== undefined && found.limit_uses !== null && found.limit_uses > 0) {
+    if (found.used_count >= found.limit_uses) {
+      return { valid: false, error: "Este cupom atingiu o limite de usos." };
+    }
+  }
+
+  // Validação da Expiração
+  if (found.expiration_date) {
+    const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    if (todayStr > found.expiration_date) {
+      return { valid: false, error: "Este cupom expirou." };
+    }
+  }
+
+  // Validação do Valor Mínimo de Compra
+  if (found.min_purchase_cost !== undefined && found.min_purchase_cost !== null && found.min_purchase_cost > 0) {
+    if (cartTotal < found.min_purchase_cost) {
+      return { 
+        valid: false, 
+        error: `Compra mínima para este cupom é de R$ ${found.min_purchase_cost.toFixed(2).replace('.', ',')}.` 
+      };
+    }
+  }
+
+  return { valid: true, coupon: found };
+}
+
+export async function incrementCouponUses(code: string): Promise<void> {
+  const cleanCode = code.toUpperCase().trim();
+  const client = getDbClient();
+  if (client) {
+    try {
+      await client.execute({
+        sql: "UPDATE coupons SET used_count = used_count + 1 WHERE code = ?",
+        args: [cleanCode]
+      });
+      return;
+    } catch (e) {
+      console.error("Falha ao incrementar uso de cupom no Turso, atualizando local", e);
+    }
+  }
+
+  // Fallback Local Storage
+  const coupons = await fetchCoupons();
+  const idx = coupons.findIndex(c => c.code === cleanCode);
+  if (idx !== -1) {
+    coupons[idx].used_count += 1;
+    localStorage.setItem(LOCAL_COUPONS_KEY, JSON.stringify(coupons));
+  }
 }

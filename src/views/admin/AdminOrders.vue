@@ -13,7 +13,9 @@ import {
   Calendar,
   DollarSign,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Wallet,
+  Coins
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -87,6 +89,16 @@ const formatDate = (isoString: string) => {
   } catch(e) {
     return isoString
   }
+}
+
+// Mapeamento visual das formas de pagamento para o lojista
+const getPaymentLabel = (method?: string) => {
+  if (!method) return 'Não especificado'
+  return {
+    pix: 'Pix',
+    cartao: 'Cartão (Crédito/Débito)',
+    dinheiro: 'Dinheiro'
+  }[method] || method
 }
 
 // Abrir modal de detalhes
@@ -319,6 +331,35 @@ const handleStatusChange = async (newStatus: Order["status"]) => {
             </div>
           </div>
 
+          <!-- Dados do Pagamento -->
+          <div class="space-y-2.5 p-4 rounded-xl border transition-colors"
+            :class="themeMode === 'dark' ? 'bg-slate-950/30 border-slate-900' : 'bg-slate-50 border-slate-150'"
+          >
+            <h4 class="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+              :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-700'"
+            >
+              <Wallet class="w-3.5 h-3.5 text-primary" />
+              Dados do Pagamento
+            </h4>
+            <div class="space-y-1"
+              :class="themeMode === 'dark' ? 'text-slate-350' : 'text-slate-650'"
+            >
+              <div><strong class="text-slate-500">Forma de Pagamento:</strong> {{ getPaymentLabel(selectedOrder.payment_method) }}</div>
+              
+              <!-- Solicitação de Troco -->
+              <div v-if="selectedOrder.payment_method === 'dinheiro' && selectedOrder.change_amount && selectedOrder.change_amount > 0"
+                class="mt-2 p-2.5 rounded-lg text-xs flex items-start gap-1.5"
+                :class="themeMode === 'dark' ? 'bg-amber-955/20 border border-amber-900/30 text-amber-400' : 'bg-amber-50 border border-amber-250 text-amber-800'"
+              >
+                <Coins class="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                <span>
+                  Cliente vai pagar em dinheiro com <strong>{{ formatPrice(selectedOrder.change_amount) }}</strong>. 
+                  Levar <strong>{{ formatPrice(selectedOrder.change_amount - selectedOrder.total_cost) }}</strong> de troco.
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Itens Comprados -->
           <div class="space-y-2">
             <h4 class="text-xs font-bold uppercase tracking-wider"
@@ -358,6 +399,11 @@ const handleStatusChange = async (newStatus: Order["status"]) => {
               <span class="font-semibold text-slate-300"
                 :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'"
               >{{ formatPrice(selectedOrder.items_cost) }}</span>
+            </div>
+            <!-- Cupom de Desconto -->
+            <div v-if="selectedOrder.coupon_code" class="flex justify-between text-red-650 font-medium">
+              <span>Desconto (Cupom: {{ selectedOrder.coupon_code }})</span>
+              <span class="font-bold">- {{ formatPrice(selectedOrder.discount_amount || 0) }}</span>
             </div>
             <div class="flex justify-between text-slate-500">
               <span>Custo de Frete</span>

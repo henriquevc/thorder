@@ -13,7 +13,9 @@ import {
   AlertCircle,
   Palette,
   MapPin,
-  Clock
+  Clock,
+  QrCode,
+  Wallet
 } from 'lucide-vue-next'
 import { 
   fetchOrders, 
@@ -32,6 +34,7 @@ import {
 } from '@/services/store'
 import AdminProducts from './AdminProducts.vue'
 import AdminOrders from './AdminOrders.vue'
+import AdminCoupons from './AdminCoupons.vue'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -62,6 +65,15 @@ const storeCloseTime = ref('23:59')
 const isSavingHours = ref(false)
 const saveHoursSuccess = ref(false)
 const saveHoursError = ref('')
+
+// Configurações do Pix da Tabacaria
+const storePixEnabled = ref(false)
+const storePixKey = ref('')
+const storePixName = ref('')
+const storePixCity = ref('Cajuru')
+const isSavingPix = ref(false)
+const savePixSuccess = ref(false)
+const savePixError = ref('')
 
 // Carrega as credenciais existentes se houver
 const currentConfig = getTursoConfig()
@@ -179,17 +191,61 @@ const handleSaveHours = async () => {
   }
 }
 
+// Salvar Configurações de Recebimento via Pix
+const handleSavePix = async () => {
+  if (storePixEnabled.value) {
+    if (!storePixKey.value.trim()) {
+      savePixError.value = 'A Chave Pix não pode ser vazia se o Pix estiver ativado.'
+      return
+    }
+    if (!storePixName.value.trim()) {
+      savePixError.value = 'O Nome do Beneficiário não pode ser vazio se o Pix estiver ativado.'
+      return
+    }
+    if (!storePixCity.value.trim()) {
+      savePixError.value = 'A Cidade do Beneficiário não pode ser vazia se o Pix estiver ativado.'
+      return
+    }
+  }
+  
+  isSavingPix.value = true
+  savePixError.value = ''
+  savePixSuccess.value = false
+  
+  try {
+    await Promise.all([
+      saveSetting('store_pix_enabled', storePixEnabled.value ? 'true' : 'false'),
+      saveSetting('store_pix_key', storePixKey.value.trim()),
+      saveSetting('store_pix_name', storePixName.value.trim()),
+      saveSetting('store_pix_city', storePixCity.value.trim())
+    ])
+    
+    savePixSuccess.value = true
+    setTimeout(() => {
+      savePixSuccess.value = false
+    }, 2000)
+  } catch (e: any) {
+    savePixError.value = e.message || 'Falha ao salvar as configurações de Pix no banco de dados.'
+  } finally {
+    isSavingPix.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     // Carrega estatísticas iniciais em paralelo
-    const [orders, products, address, whatsapp, hoursEnabled, openTime, closeTime] = await Promise.all([
+    const [orders, products, address, whatsapp, hoursEnabled, openTime, closeTime, pixEnabled, pixKey, pixName, pixCity] = await Promise.all([
       fetchOrders(),
       fetchProducts(),
       fetchSetting('store_address', 'Rua Marechal Deodoro, 150 - Centro, Cajuru - SP'),
       fetchSetting('store_whatsapp', '5516999999999'),
       fetchSetting('store_hours_enabled', 'false'),
       fetchSetting('store_open_time', '18:00'),
-      fetchSetting('store_close_time', '23:59')
+      fetchSetting('store_close_time', '23:59'),
+      fetchSetting('store_pix_enabled', 'false'),
+      fetchSetting('store_pix_key', ''),
+      fetchSetting('store_pix_name', ''),
+      fetchSetting('store_pix_city', 'Cajuru')
     ])
     ordersList.value = orders
     productsList.value = products
@@ -198,6 +254,10 @@ onMounted(async () => {
     storeHoursEnabled.value = hoursEnabled === 'true'
     storeOpenTime.value = openTime
     storeCloseTime.value = closeTime
+    storePixEnabled.value = pixEnabled === 'true'
+    storePixKey.value = pixKey
+    storePixName.value = pixName
+    storePixCity.value = pixCity
   } catch (err) {
     console.error('Falha ao obter dados estatísticos:', err)
   } finally {
@@ -351,6 +411,11 @@ const formatPrice = (val: number) => {
           >
             Pedidos
           </TabsTrigger>
+          <TabsTrigger value="cupons" class="rounded-lg text-xs md:text-sm font-bold px-5 py-2 transition-all"
+            :class="themeMode === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-655 hover:text-slate-900'"
+          >
+            Cupons
+          </TabsTrigger>
           <TabsTrigger value="banco" class="rounded-lg text-xs md:text-sm font-bold px-5 py-2 transition-all"
             :class="themeMode === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-655 hover:text-slate-900'"
           >
@@ -367,6 +432,11 @@ const formatPrice = (val: number) => {
       <!-- Tab Conteúdo: Pedidos -->
       <TabsContent value="pedidos" class="outline-none">
         <AdminOrders />
+      </TabsContent>
+
+      <!-- Tab Conteúdo: Cupons -->
+      <TabsContent value="cupons" class="outline-none animate-in fade-in duration-300">
+        <AdminCoupons />
       </TabsContent>
 
       <!-- Tab Conteúdo: Configurações -->
@@ -623,6 +693,117 @@ const formatPrice = (val: number) => {
               >
                 <Loader2 v-if="isSavingHours" class="w-4 h-4 animate-spin mr-1.5" />
                 {{ isSavingHours ? 'Salvando...' : 'Salvar Horário' }}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <!-- CONFIGURAÇÕES DE PAGAMENTO VIA PIX -->
+        <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
+          :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
+        >
+          <CardHeader class="border-b pb-4" :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'">
+            <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+              :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+            >
+              <Wallet class="w-5 h-5 text-primary" />
+              Recebimento via Pix (Gratuito)
+            </CardTitle>
+            <p class="text-slate-400 text-xs mt-1">
+              Habilite a exibição automática de um QR Code Pix e do código "Copia e Cola" com o valor exato do pedido na tela de sucesso de compra. O cliente poderá pagar e depois enviar o comprovante via WhatsApp.
+            </p>
+          </CardHeader>
+          
+          <CardContent class="p-6 space-y-5">
+            <!-- Switch Habilitar Pix -->
+            <div class="flex items-center gap-3 p-3 rounded-xl border"
+              :class="themeMode === 'dark' ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'"
+            >
+              <input 
+                id="pix-enabled-checkbox"
+                v-model="storePixEnabled" 
+                type="checkbox"
+                class="w-4.5 h-4.5 text-primary rounded border-slate-300 focus:ring-primary focus:ring-opacity-50 cursor-pointer"
+              />
+              <label for="pix-enabled-checkbox" class="text-xs font-bold select-none cursor-pointer flex-1"
+                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
+              >
+                Habilitar QR Code Pix dinâmico com valor na tela de sucesso
+              </label>
+            </div>
+
+            <!-- Dados do Pix (Aparecem desabilitados se Pix desativado) -->
+            <div class="space-y-4" :class="{ 'opacity-60 pointer-events-none': !storePixEnabled }">
+              <!-- Chave Pix -->
+              <div class="space-y-2">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                  :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                >Chave Pix de Recebimento</label>
+                <Input 
+                  v-model="storePixKey" 
+                  placeholder="E-mail, Telefone, CPF, CNPJ ou Chave Aleatória" 
+                  class="rounded-xl w-full"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
+                />
+                <p class="text-[10px] text-slate-500">
+                  Insira a chave cadastrada no seu banco exatamente como deve ser copiada.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Nome do Beneficiário -->
+                <div class="space-y-2">
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                    :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                  >Nome do Beneficiário</label>
+                  <Input 
+                    v-model="storePixName" 
+                    placeholder="Ex: Joao Silva ou Nome da Loja" 
+                    class="rounded-xl w-full"
+                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
+                  />
+                  <p class="text-[10px] text-slate-500">Nome cadastrado na conta bancária (máx. 25 letras, sem acentos no QR Code).</p>
+                </div>
+
+                <!-- Cidade do Beneficiário -->
+                <div class="space-y-2">
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                    :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                  >Cidade do Beneficiário</label>
+                  <Input 
+                    v-model="storePixCity" 
+                    placeholder="Ex: Cajuru" 
+                    class="rounded-xl w-full"
+                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
+                  />
+                  <p class="text-[10px] text-slate-500">Cidade cadastrada na conta (máx. 15 letras, sem acentos no QR Code).</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Feedbacks -->
+            <div v-if="savePixError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              <span>{{ savePixError }}</span>
+            </div>
+
+            <div v-if="savePixSuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
+              <Check class="w-4 h-4 shrink-0" />
+              <span>Configurações do Pix salvas com sucesso no banco de dados Turso!</span>
+            </div>
+
+            <!-- Ações -->
+            <div class="flex justify-end pt-2 border-t"
+              :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-150'"
+            >
+              <Button 
+                size="sm"
+                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                :disabled="isSavingPix"
+                @click="handleSavePix"
+              >
+                <Loader2 v-if="isSavingPix" class="w-4 h-4 animate-spin mr-1.5" />
+                {{ isSavingPix ? 'Salvando...' : 'Salvar Configurações Pix' }}
               </Button>
             </div>
           </CardContent>

@@ -6,10 +6,8 @@ import {
   Trash2, 
   Image as ImageIcon,
   Loader2,
-  CheckCircle,
   AlertTriangle,
   UploadCloud,
-  FileText
 } from 'lucide-vue-next'
 import { 
   fetchProducts, 
@@ -17,7 +15,6 @@ import {
   updateProduct, 
   deleteProduct, 
   themeMode,
-  themeColor,
   type Product 
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
@@ -290,11 +287,11 @@ const handleDeleteProduct = async (productId: number) => {
               <TableCell class="text-center">
                 <span 
                   class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold"
-                  :class="prod.stock > 5 
-                    ? 'bg-emerald-950/30 text-emerald-400 border border-emerald-900/30' 
+                  :class="prod.stock > 3 
+                    ? 'bg-green-900/20 text-green-600 border border-green-900/30' 
                     : prod.stock > 0 
-                    ? 'bg-amber-950/30 text-amber-500 border border-amber-900/30' 
-                    : 'bg-red-950/30 text-red-450 border border-red-900/30'"
+                    ? 'bg-yellow-800/10 text-yellow-500 border border-yellow-900/30' 
+                    : 'bg-red-950/20 text-red-400 border border-red-900/30'"
                 >
                   {{ prod.stock }} un
                 </span>

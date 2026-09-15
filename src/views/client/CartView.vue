@@ -17,6 +17,7 @@ import {
   saveCart, 
   calculateShipping, 
   checkStoreOpen,
+  currentCompanySlug,
   type CartItem, 
   type ShippingOption 
 } from '@/services/store'
@@ -193,7 +194,7 @@ const handleGoToCheckout = () => {
     document.getElementById('cep-input')?.focus()
     return
   }
-  router.push('/checkout')
+  router.push(currentCompanySlug.value ? `/${currentCompanySlug.value}/checkout` : '/checkout')
 }
 </script>
 
@@ -210,7 +211,7 @@ const handleGoToCheckout = () => {
           Gerencie os itens do seu pedido e calcule a taxa de entrega.
         </p>
       </div>
-      <router-link to="/" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
+      <router-link :to="currentCompanySlug ? `/${currentCompanySlug}` : '/'" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar à loja
       </router-link>
@@ -236,7 +237,7 @@ const handleGoToCheckout = () => {
       </p>
       <Button 
         class="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 shadow-lg shadow-primary/20"
-        @click="router.push('/')"
+        @click="router.push(currentCompanySlug ? `/${currentCompanySlug}` : '/')"
       >
         Ver Catálogo
       </Button>

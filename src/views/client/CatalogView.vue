@@ -21,6 +21,7 @@ import {
   cartCount,
   themeMode,
   themeColor,
+  currentCompany,
   type Product,
   type CartItem
 } from '@/services/store'
@@ -171,7 +172,7 @@ const addAndCloseQuickView = (product: Product) => {
 
 <template>
   <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <!-- Hero Banner Premium Tabacaria -->
+    <!-- Hero Banner Premium Dinâmico -->
     <section class="relative overflow-hidden rounded-3xl border transition-colors duration-300 p-8 md:p-12 shadow-2xl"
       :class="themeMode === 'dark' 
         ? 'border-slate-850 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/15' 
@@ -189,34 +190,42 @@ const addAndCloseQuickView = (product: Product) => {
             :class="themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary'"
           >
             <Sparkles class="w-3.5 h-3.5" />
-            Hookah Shop &amp; Tabacaria Premium
+            {{ currentCompany?.name || 'Catálogo Premium' }}
           </div>
           
-          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
-            :class="themeMode === 'dark' ? 'bg-gradient-to-r from-white via-slate-100 to-primary bg-clip-text text-transparent' : 'text-slate-900'"
+          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors text-slate-900"
+            :class="themeMode === 'dark' ? 'text-slate-50' : 'text-slate-900'"
           >
-            <span class="text-primary">X-Smoke</span> Tabacaria 
+            {{ currentCompany?.name }}
           </h1>
           
           <p class="text-sm md:text-base leading-relaxed"
             :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
           >
-            A arte da fumaça em alta performance. Explore nossa seleção exclusiva de narguilés de luxo, roshs esmaltados, essências selecionadas das melhores marcas e acessórios de alto rendimento
+            {{ currentCompany?.description }}
           </p>
         </div>
 
         <!-- Coluna Logo Integrado -->
         <div class="md:col-span-4 flex items-center justify-center">
           <div class="relative group">
-            <!-- Glow externo dourado no dark mode -->
+            <!-- Glow externo no dark mode -->
             <div v-if="themeMode === 'dark'" class="absolute inset-0 rounded-full bg-primary/25 blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-500"></div>
             
-            <img 
-              src="/logo.jpg" 
-              alt="Logo Tabacaria X-Smoke" 
-              class="relative w-40 h-40 md:w-48 md:h-48 rounded-full border-4 border-primary shadow-2xl object-cover transition-all duration-500 group-hover:scale-105"
+            <div 
+              class="relative w-36 h-36 md:w-44 md:h-44 rounded-full border-4 border-primary shadow-2xl flex items-center justify-center text-white text-5xl font-black bg-gradient-to-tr from-brand-start to-brand-end transition-all duration-500 group-hover:scale-105 overflow-hidden bg-white/10"
               :class="themeMode === 'dark' ? 'border-primary shadow-primary/10' : 'border-primary/60 shadow-slate-400/20'"
-            />
+            >
+              <img 
+                v-if="currentCompany?.image_data" 
+                :src="currentCompany.image_data" 
+                :alt="currentCompany.name"
+                class="w-full h-full object-cover" 
+              />
+              <span v-else>
+                {{ currentCompany?.name ? currentCompany.name.charAt(0) : 'T' }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -268,7 +277,7 @@ const addAndCloseQuickView = (product: Product) => {
     <!-- Catálogo de Produtos Vazio -->
     <div v-else-if="filteredProducts.length === 0" class="text-center py-16 bg-slate-900/10 border border-dashed border-slate-800 rounded-3xl space-y-3">
       <AlertTriangle class="w-12 h-12 text-amber-500 mx-auto" />
-      <h3 class="text-lg font-bold text-slate-200">Nenhum produto encontrado</h3>
+      <h3 class="text-lg font-bold text-slate-500">Nenhum produto encontrado</h3>
       <p class="text-slate-500 text-sm max-w-xs mx-auto">
         Tente ajustar sua busca ou filtro para encontrar o que procura.
       </p>

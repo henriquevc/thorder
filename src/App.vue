@@ -1,24 +1,27 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { 
   ShoppingBag, 
-  UserCheck
+  UserCheck,
+  LogOut,
+  ShieldCheck,
+  User,
+  Store,
+  Lock
 } from 'lucide-vue-next'
 import { 
   cartCount, 
-  themeMode
+  themeMode,
+  currentCompany,
+  currentCompanySlug,
+  currentUser,
+  logoutUser
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from '@/components/ui/dialog'
 
 const router = useRouter()
+const route = useRoute()
 
 // Animação de "bounce" temporária ao alterar contagem do carrinho
 const animateCart = ref(false)
@@ -32,14 +35,28 @@ watch(cartCount, (newVal, oldVal) => {
 })
 
 // Função para verificar se a rota ativa é Admin
-const isAdminRoute = () => {
-  return router.currentRoute.value.path.startsWith('/admin')
-}
+const isAdminRoute = computed(() => {
+  return route.path.startsWith('/admin')
+})
+
+// Destino dinâmico da logo no cabeçalho
+const logoDestination = computed(() => {
+  if (currentCompanySlug.value) {
+    return `/${currentCompanySlug.value}`
+  }
+  if (currentUser.value?.role === 'superadmin') {
+    return '/'
+  }
+  if (currentUser.value?.role === 'store_admin' && currentUser.value.company_slug) {
+    return `/${currentUser.value.company_slug}`
+  }
+  return '/admin/login'
+})
 
 // Logout do Admin
 const handleAdminLogout = () => {
-  sessionStorage.removeItem('admin_authenticated')
-  router.push('/')
+  logoutUser()
+  router.push('/admin/login')
 }
 </script>
 
@@ -47,7 +64,7 @@ const handleAdminLogout = () => {
   <div class="min-h-screen flex flex-col font-sans antialiased transition-colors duration-300"
     :class="themeMode === 'dark' ? 'bg-slate-950 text-slate-100 selection:bg-primary selection:text-primary-foreground' : 'bg-slate-50 text-slate-900 selection:bg-primary selection:text-primary-foreground'"
   >
-    <!-- Efeito de Background Abstrato Premium (Apenas no Modo Escuro para não lavar as cores) -->
+    <!-- Efeito de Background Abstrato Premium -->
     <div v-if="themeMode === 'dark'" class="fixed inset-0 overflow-hidden pointer-events-none z-0">
       <div class="absolute -top-[40%] -left-[20%] w-[80%] h-[80%] rounded-full bg-primary/10 blur-[120px]"></div>
       <div class="absolute -bottom-[40%] -right-[20%] w-[80%] h-[80%] rounded-full bg-blue-900/5 blur-[120px]"></div>
@@ -60,21 +77,41 @@ const handleAdminLogout = () => {
       <div class="container mx-auto px-4 h-16 flex items-center justify-between">
         <!-- Logo e Links -->
         <div class="flex items-center gap-8">
-          <router-link to="/" class="flex items-center group py-1">
-            <img 
-              src="/logo_horizontal.png" 
-              alt="X-Smoke Tabacaria" 
-              class="h-10 md:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-102"
-            />
+          <router-link :to="logoDestination" class="flex items-center group py-1">
+            <!-- Logo Dinâmica com base na Loja Ativa -->
+            <div v-if="currentCompany" class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-start to-brand-end flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0 transition-transform duration-300 group-hover:scale-105 overflow-hidden">
+                <img 
+                  v-if="currentCompany.image_data" 
+                  :src="currentCompany.image_data" 
+                  :alt="currentCompany.name" 
+                  class="w-full h-full object-cover" 
+                />
+                <span v-else>
+                  {{ currentCompany.name.charAt(0) }}
+                </span>
+              </div>
+              <span class="text-base md:text-lg font-black tracking-tight bg-gradient-to-r from-brand-start to-brand-end bg-clip-text text-transparent group-hover:opacity-90">
+                {{ currentCompany.name }}
+              </span>
+            </div>
+            <div v-else class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-md shrink-0">
+                T
+              </div>
+              <span class="text-base md:text-lg font-black tracking-tight bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent">
+                Thorder Portal
+              </span>
+            </div>
           </router-link>
         </div>
 
         <!-- Ações do Cabeçalho -->
         <div class="flex items-center gap-3">
-          <!-- Ícone do Carrinho (Apenas para rotas Cliente) -->
+          <!-- Ícone do Carrinho (Apenas para rotas Cliente se houver empresa ativa) -->
           <router-link 
-            v-if="!isAdminRoute()"
-            to="/carrinho" 
+            v-if="!isAdminRoute && currentCompanySlug"
+            :to="`/${currentCompanySlug}/carrinho`" 
             class="relative w-10 h-10 sm:w-auto sm:px-3.5 rounded-xl border flex items-center justify-center gap-2 transition-all duration-300"
             :class="[
               themeMode === 'dark' ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white' : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900',
@@ -95,26 +132,52 @@ const handleAdminLogout = () => {
             </span>
           </router-link>
 
-          <!-- Botão Sair (Somente se logado e no Admin) -->
-          <Button 
-            v-if="isAdminRoute() && $route.name !== 'admin-login'"
-            variant="ghost" 
-            size="sm"
-            class="text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-xl gap-2 font-bold"
-            @click="handleAdminLogout"
+          <!-- Usuário Logado no Admin -->
+          <div v-if="isAdminRoute && currentUser && route.name !== 'admin-login'" class="flex items-center gap-2">
+            <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/60 bg-muted/40 text-xs">
+              <div class="w-6 h-6 rounded-full flex items-center justify-center font-black text-white text-[10px]"
+                :class="currentUser.role === 'superadmin' ? 'bg-amber-500' : 'bg-primary'"
+              >
+                {{ currentUser.name.charAt(0) }}
+              </div>
+              <div class="flex flex-col text-left">
+                <span class="font-bold leading-tight truncate max-w-[120px]">{{ currentUser.name }}</span>
+                <span class="text-[9px] uppercase font-semibold text-muted-foreground leading-tight">
+                  {{ currentUser.role === 'superadmin' ? 'Super Admin' : 'Lojista' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Botão Sair -->
+            <Button 
+              variant="ghost" 
+              size="sm"
+              class="text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl gap-1.5 font-bold text-xs"
+              @click="handleAdminLogout"
+            >
+              <LogOut class="w-4 h-4" />
+              <span class="hidden sm:inline">Sair</span>
+            </Button>
+          </div>
+
+          <!-- Link para Painel do Lojista (se na Landing page) -->
+          <router-link 
+            v-else-if="!isAdminRoute && !currentCompanySlug && currentUser?.role === 'superadmin'"
+            to="/admin"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-border/80 hover:bg-muted/50 transition-colors"
           >
-            <UserCheck class="w-4 h-4" />
-            <span>Sair</span>
-          </Button>
+            <Lock class="w-3.5 h-3.5 text-primary" />
+            <span>Painel Master</span>
+          </router-link>
         </div>
       </div>
     </header>
 
     <!-- Conteúdo Principal Dinâmico -->
     <main class="flex-1 container mx-auto px-4 py-6 md:py-8 z-10">
-      <router-view v-slot="{ Component }">
+      <router-view v-slot="{ Component, route }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <component :is="Component" :key="route.path" />
         </transition>
       </router-view>
     </main>
@@ -127,7 +190,7 @@ const handleAdminLogout = () => {
         <p class="text-sm font-semibold tracking-wide"
           :class="themeMode === 'dark' ? 'bg-gradient-to-r from-slate-200 to-slate-400 bg-clip-text text-transparent' : 'text-slate-700'"
         >
-          X-Smoke Tabacaria &copy; 2026
+          {{ currentCompany ? currentCompany.name : 'Thorder Portal' }} &copy; 2026
         </p>
       </div>
     </footer>
@@ -135,30 +198,13 @@ const handleAdminLogout = () => {
 </template>
 
 <style>
-/* Transições de Rota Fluida */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-
+.fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-  transform: translateY(-6px);
-}
-
-/* Animação para erros do formulário */
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
-
-.animate-shake {
-  animation: shake 0.3s ease-in-out;
 }
 </style>

@@ -18,6 +18,7 @@ import {
   createOrder, 
   checkStoreOpen,
   validateCoupon,
+  currentCompanySlug,
   type CartItem, 
   type ShippingOption,
   type Coupon
@@ -135,7 +136,8 @@ onMounted(async () => {
   
   // Se o carrinho estiver vazio, manda de volta
   if (cartItems.value.length === 0) {
-    router.push('/carrinho')
+    const target = currentCompanySlug.value ? `/${currentCompanySlug.value}/carrinho` : '/carrinho'
+    router.push(target)
     return
   }
 
@@ -316,7 +318,11 @@ const handleSubmitOrder = async () => {
     sessionStorage.removeItem('shipping_cep')
     
     // Direciona para tela de confirmação de sucesso
-    router.push({ name: 'order-success', params: { id: orderId } })
+    if (currentCompanySlug.value) {
+      router.push({ name: 'company-order-success', params: { companySlug: currentCompanySlug.value, id: orderId } })
+    } else {
+      router.push({ name: 'order-success', params: { id: orderId } })
+    }
   } catch (err: any) {
     submitError.value = err.message || 'Falha ao registrar pedido no banco Turso.'
   } finally {
@@ -338,7 +344,7 @@ const handleSubmitOrder = async () => {
           Preencha suas informações de contato e endereço para entrega do seu pacote.
         </p>
       </div>
-      <router-link to="/carrinho" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
+      <router-link :to="currentCompanySlug ? `/${currentCompanySlug}/carrinho` : '/carrinho'" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar ao carrinho
       </router-link>

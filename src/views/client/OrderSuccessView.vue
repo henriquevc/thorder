@@ -17,7 +17,7 @@ import {
   Coins,
   Clock
 } from 'lucide-vue-next'
-import { fetchOrders, fetchSetting, type Order } from '@/services/store'
+import { fetchOrders, fetchSetting, currentCompany, currentCompanySlug, type Order } from '@/services/store'
 import { gerarPayloadPix } from '@/services/pix'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -93,7 +93,8 @@ const getWhatsappUrl = () => {
     paymentDetailsText += `\n• *Troco para:* ${formatPrice(o.change_amount)} (Levar ${formatPrice(troco)} de troco)`
   }
   
-  const rawMessage = `Olá, X-Smoke! Acabei de fazer um pedido no site:
+  const storeName = currentCompany.value ? currentCompany.value.name : 'Loja'
+  const rawMessage = `Olá, ${storeName}! Acabei de fazer um pedido no site:
 
 📦 *PEDIDO #${o.id}*
 📅 *Data:* ${formatDate(o.created_at)}
@@ -114,7 +115,7 @@ ${itemText}
 • *Taxa de Entrega:* ${formatPrice(o.shipping_cost)}${couponText}
 *Total Geral: ${formatPrice(o.total_cost)}*${paymentDetailsText}
 
-Aguardando confirmação do pagamento / retirada! 💨`
+Aguardando confirmação do pedido!`
 
   const encodedMessage = encodeURIComponent(rawMessage)
   const cleanPhone = storeWhatsappNumber.value.replace(/\D/g, '')
@@ -505,7 +506,7 @@ onMounted(async () => {
         <Button 
           variant="outline"
           class="rounded-xl border-slate-300 hover:bg-slate-100 text-slate-700 font-bold px-6"
-          @click="router.push('/')"
+          @click="router.push(currentCompanySlug ? `/${currentCompanySlug}` : '/')"
         >
           <ShoppingBag class="w-4 h-4 mr-2 text-primary" />
           Voltar ao Catálogo

@@ -95,7 +95,7 @@ const setupTileLayer = () => {
     map.removeLayer(tileLayer)
   }
 
-  const cartoApiKey = (import.meta.env.VITE_CARTO_API_KEY || '').trim()
+  const cartoApiKey = (import.meta.env.CARTO_API_KEY || '').trim()
   const isDark = themeMode.value === 'dark'
 
   let tileUrl = ''

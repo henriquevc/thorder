@@ -97,6 +97,7 @@ import AdminOrders from './AdminOrders.vue'
 import AdminCoupons from './AdminCoupons.vue'
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
 import ImageCropperModal from '@/components/ImageCropperModal.vue'
+import StoreLocationMap from '@/components/StoreLocationMap.vue'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -122,8 +123,14 @@ const isConnecting = ref(false)
 const connectError = ref('')
 const connectSuccess = ref(false)
 
-// Configurações do Endereço e Entrega por Distância da Loja
+// Configurações do Endereço e Entrega por Distância da Loja (Estilo iFood / Uber)
 const storeCep = ref('')
+const storeStreet = ref('')
+const storeNumber = ref('')
+const storeNeighborhood = ref('')
+const storeComplement = ref('')
+const storeCity = ref('')
+const storeState = ref('')
 const storeAddress = ref('')
 const storeLat = ref<number | null>(null)
 const storeLng = ref<number | null>(null)
@@ -138,6 +145,91 @@ const isGeocodingAddress = ref(false)
 const isSavingDelivery = ref(false)
 const saveDeliverySuccess = ref(false)
 const saveDeliveryError = ref('')
+
+// Concatena campos estruturados em endereço formatado único
+const updateStoreAddressFromFields = () => {
+  const parts: string[] = []
+  if (storeStreet.value.trim()) {
+    let streetPart = storeStreet.value.trim()
+    if (storeNumber.value.trim()) streetPart += `, ${storeNumber.value.trim()}`
+    if (storeComplement.value.trim()) streetPart += `, ${storeComplement.value.trim()}`
+    parts.push(streetPart)
+  }
+  if (storeNeighborhood.value.trim()) {
+    parts.push(storeNeighborhood.value.trim())
+  }
+  if (storeCity.value.trim()) {
+    let cityPart = storeCity.value.trim()
+    if (storeState.value.trim()) cityPart += ` - ${storeState.value.trim().toUpperCase()}`
+    parts.push(cityPart)
+  }
+  if (parts.length > 0) {
+    storeAddress.value = parts.join(' - ')
+  }
+}
+
+// Extrai campos estruturados a partir do endereço em texto salvo
+const parseAddressToFields = (fullAddress: string) => {
+  if (!fullAddress) return
+  const dashParts = fullAddress.split('-').map(s => s.trim())
+  if (dashParts.length >= 3) {
+    const streetPart = dashParts[0]
+    const numMatch = streetPart.match(/^(.*?)[,\s]+(\d+.*)$/)
+    if (numMatch) {
+      storeStreet.value = numMatch[1].trim()
+      storeNumber.value = numMatch[2].trim()
+    } else {
+      storeStreet.value = streetPart
+    }
+    storeNeighborhood.value = dashParts[1]
+    const cityRaw = dashParts[2]
+    storeCity.value = cityRaw.replace(/\s+[A-Z]{2}$/i, '').trim()
+    const lastPart = dashParts[dashParts.length - 1]
+    const ufMatch = lastPart.match(/([A-Z]{2})$/i)
+    if (ufMatch) {
+      storeState.value = ufMatch[1].toUpperCase()
+    }
+  } else {
+    const numMatch = fullAddress.match(/^(.*?)[,\s]+(\d+.*)$/)
+    if (numMatch) {
+      storeStreet.value = numMatch[1].trim()
+      storeNumber.value = numMatch[2].trim()
+    } else {
+      storeStreet.value = fullAddress
+    }
+  }
+}
+
+// Callback ao mover o pino no mapa ou escolher endereço na busca
+const handleMapLocationUpdate = (data: {
+  lat: number
+  lng: number
+  street?: string
+  number?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  cep?: string
+  formattedAddress?: string
+}) => {
+  storeLat.value = data.lat
+  storeLng.value = data.lng
+
+  if (data.street) storeStreet.value = data.street
+  if (data.number) storeNumber.value = data.number
+  if (data.neighborhood) storeNeighborhood.value = data.neighborhood
+  if (data.city) storeCity.value = data.city
+  if (data.state) storeState.value = data.state
+  if (data.cep && (!storeCep.value || storeCep.value.replace(/\D/g, '').length < 8)) {
+    storeCep.value = data.cep
+  }
+
+  if (data.formattedAddress) {
+    storeAddress.value = data.formattedAddress
+  } else {
+    updateStoreAddressFromFields()
+  }
+}
 
 // Simulador de Frete no Painel
 const testSimulatorCep = ref('')
@@ -250,9 +342,14 @@ const handleSearchStoreCep = async () => {
     if (geo) {
       storeLat.value = geo.lat
       storeLng.value = geo.lng
-      if (geo.address && (!storeAddress.value || storeAddress.value.length < 5)) {
-        storeAddress.value = `${geo.address}${geo.city ? ', ' + geo.city : ''}${geo.state ? ' - ' + geo.state : ''}`
+      if (geo.address) {
+        const parts = geo.address.split('-').map(s => s.trim())
+        storeStreet.value = parts[0] || geo.address
+        if (parts[1]) storeNeighborhood.value = parts[1]
       }
+      if (geo.city) storeCity.value = geo.city
+      if (geo.state) storeState.value = geo.state
+      updateStoreAddressFromFields()
     } else {
       saveDeliveryError.value = 'Não foi possível encontrar as coordenadas automaticamente por este CEP. Verifique o CEP ou digite o endereço completo.'
     }
@@ -519,6 +616,7 @@ const loadStoreData = async () => {
     productsList.value = products
     storeCep.value = deliverySettings.storeCep
     storeAddress.value = deliverySettings.storeAddress
+    parseAddressToFields(deliverySettings.storeAddress)
     storeLat.value = deliverySettings.storeLat
     storeLng.value = deliverySettings.storeLng
     storeWhatsapp.value = deliverySettings.storeWhatsapp
@@ -1861,95 +1959,195 @@ const formatPrice = (val: number) => {
           </CardHeader>
           
           <CardContent class="p-6 space-y-6">
-            <!-- 1. ENDEREÇO E COORDENADAS -->
+            <!-- 1. ENDEREÇO E COORDENADAS COM MAPA INTERATIVO (ESTILO IFOOD / UBER) -->
             <div class="space-y-4">
-              <h4 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <MapPin class="w-4 h-4" />
-                <span>1. Localização Física da Loja</span>
-              </h4>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <MapPin class="w-4 h-4" />
+                    <span>1. Localização Física &amp; Mapa da Loja</span>
+                  </h4>
+                  <p class="text-slate-400 text-xs mt-0.5">
+                    Defina o endereço real e posicione o pino na entrada do seu estabelecimento para o cálculo preciso do raio de entrega.
+                  </p>
+                </div>
+              </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- CEP da Loja -->
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">CEP da Loja *</label>
-                  <div class="flex gap-2">
+              <!-- MAPA INTERATIVO LEAFLET COM BUSCA REAL E PINO ARRASTÁVEL -->
+              <StoreLocationMap 
+                :lat="storeLat" 
+                :lng="storeLng" 
+                :radius-km="deliveryMaxRadiusKm" 
+                :store-name="companyNameEdit || 'Sua Loja'"
+                @update:location="handleMapLocationUpdate" 
+              />
+
+              <!-- FORMULÁRIO DE ENDEREÇO ESTRUTURADO -->
+              <div class="space-y-3 pt-2">
+                <!-- Linha 1: CEP e WhatsApp -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <!-- CEP da Loja -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">CEP da Loja *</label>
+                    <div class="flex gap-2">
+                      <Input 
+                        v-model="storeCep" 
+                        placeholder="14240-000" 
+                        class="rounded-xl font-mono text-xs focus:ring-primary"
+                        :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                        @keyup.enter="handleSearchStoreCep"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        class="rounded-xl shrink-0 font-bold text-xs"
+                        :disabled="isSearchingStoreCep"
+                        @click="handleSearchStoreCep"
+                        title="Buscar dados do CEP"
+                      >
+                        <Loader2 v-if="isSearchingStoreCep" class="w-4 h-4 animate-spin" />
+                        <Search v-else class="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <!-- WhatsApp de Pedidos -->
+                  <div class="space-y-1 md:col-span-2">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">WhatsApp para Receber Pedidos *</label>
                     <Input 
-                      v-model="storeCep" 
-                      placeholder="14240-000" 
+                      v-model="storeWhatsapp" 
+                      placeholder="Ex: 5516999999999" 
                       class="rounded-xl font-mono text-xs focus:ring-primary"
                       :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
-                      @keyup.enter="handleSearchStoreCep"
+                    />
+                  </div>
+                </div>
+
+                <!-- Linha 2: Rua e Número -->
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <!-- Rua / Logradouro -->
+                  <div class="sm:col-span-3 space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Rua / Avenida / Logradouro *</label>
+                    <Input 
+                      v-model="storeStreet" 
+                      placeholder="Ex: Rua Marechal Deodoro" 
+                      class="rounded-xl text-xs focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+
+                  <!-- Número (Destacado) -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold flex items-center justify-between" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">
+                      <span>Número *</span>
+                      <span class="text-[10px] text-primary font-bold">Obrigatório</span>
+                    </label>
+                    <Input 
+                      v-model="storeNumber" 
+                      placeholder="Ex: 150" 
+                      class="rounded-xl text-xs font-bold text-center focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+                </div>
+
+                <!-- Linha 3: Bairro, Complemento, Cidade e Estado -->
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <!-- Bairro -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Bairro *</label>
+                    <Input 
+                      v-model="storeNeighborhood" 
+                      placeholder="Ex: Centro" 
+                      class="rounded-xl text-xs focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+
+                  <!-- Complemento / Referência -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Complemento / Referência</label>
+                    <Input 
+                      v-model="storeComplement" 
+                      placeholder="Ex: Loja 2, Ao lado da praça" 
+                      class="rounded-xl text-xs focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+
+                  <!-- Cidade -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Cidade *</label>
+                    <Input 
+                      v-model="storeCity" 
+                      placeholder="Ex: Cajuru" 
+                      class="rounded-xl text-xs focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+
+                  <!-- UF -->
+                  <div class="space-y-1">
+                    <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">UF *</label>
+                    <Input 
+                      v-model="storeState" 
+                      placeholder="SP" 
+                      maxlength="2"
+                      class="rounded-xl text-xs uppercase font-bold text-center focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @input="updateStoreAddressFromFields"
+                    />
+                  </div>
+                </div>
+
+                <!-- Linha 4: Endereço Formatado Completo & Sincronizador -->
+                <div class="space-y-1 pt-1">
+                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Endereço Completo Formatado (Salvo na Loja e Exibido nos Pedidos)</label>
+                  <div class="flex gap-2">
+                    <Input 
+                      v-model="storeAddress" 
+                      placeholder="Rua, Número - Bairro, Cidade - UF" 
+                      class="rounded-xl focus:ring-primary w-full text-xs font-medium"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
                     />
                     <Button 
                       type="button" 
                       variant="outline" 
                       size="sm"
-                      class="rounded-xl shrink-0 font-bold text-xs"
-                      :disabled="isSearchingStoreCep"
-                      @click="handleSearchStoreCep"
-                      title="Buscar coordenadas pelo CEP"
+                      class="rounded-xl shrink-0 font-bold text-xs flex items-center gap-1.5"
+                      :disabled="isGeocodingAddress"
+                      @click="handleGeocodeStoreAddress"
+                      title="Sincronizar e localizar coordenadas no mapa a partir deste endereço"
                     >
-                      <Loader2 v-if="isSearchingStoreCep" class="w-4 h-4 animate-spin" />
-                      <Search v-else class="w-4 h-4" />
+                      <Loader2 v-if="isGeocodingAddress" class="w-4 h-4 animate-spin" />
+                      <Navigation v-else class="w-4 h-4 text-primary" />
+                      <span>Sincronizar no Mapa</span>
                     </Button>
                   </div>
-                  <p class="text-[10px] text-slate-400">Clique na lupa para preencher endereço e coordenadas.</p>
                 </div>
 
-                <!-- WhatsApp de Pedidos -->
-                <div class="space-y-1.5 md:col-span-2">
-                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">WhatsApp para Receber Pedidos *</label>
-                  <Input 
-                    v-model="storeWhatsapp" 
-                    placeholder="Ex: 5516999999999" 
-                    class="rounded-xl font-mono text-xs focus:ring-primary"
-                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
-                  />
-                  <p class="text-[10px] text-slate-400">Número com código do país (55) e DDD. Ex: 5516999999999.</p>
-                </div>
-              </div>
-
-              <!-- Endereço Completo -->
-              <div class="space-y-1.5">
-                <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Endereço Completo (Rua, Número, Bairro, Cidade - UF) *</label>
-                <div class="flex gap-2">
-                  <Input 
-                    v-model="storeAddress" 
-                    placeholder="Ex: Rua Marechal Deodoro, 150 - Centro, Cajuru - SP" 
-                    class="rounded-xl focus:ring-primary w-full text-xs"
-                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    class="rounded-xl shrink-0 font-bold text-xs flex items-center gap-1.5"
-                    :disabled="isGeocodingAddress"
-                    @click="handleGeocodeStoreAddress"
-                    title="Recalcular coordenadas a partir do texto do endereço"
-                  >
-                    <Loader2 v-if="isGeocodingAddress" class="w-4 h-4 animate-spin" />
-                    <Navigation v-else class="w-4 h-4" />
-                    <span class="hidden sm:inline">GPS</span>
-                  </Button>
-                </div>
-              </div>
-
-              <!-- Visualizador de Coordenadas -->
-              <div class="p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs"
-                :class="themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'"
-              >
-                <div class="flex items-center gap-3">
-                  <span class="text-slate-400 font-mono text-[11px]">Latitude: <strong class="text-foreground">{{ storeLat !== null ? storeLat.toFixed(6) : 'Não definida' }}</strong></span>
-                  <span class="text-slate-400 font-mono text-[11px]">Longitude: <strong class="text-foreground">{{ storeLng !== null ? storeLng.toFixed(6) : 'Não definida' }}</strong></span>
-                </div>
-                <div class="text-[11px] text-slate-400">
-                  <span v-if="storeLat && storeLng" class="text-emerald-500 font-semibold flex items-center gap-1">
-                    <CheckCircle2 class="w-3.5 h-3.5" /> Coordenadas sincronizadas para cálculo do raio
-                  </span>
-                  <span v-else class="text-amber-500 font-semibold">
-                    Informe o CEP e clique na lupa para calcular as coordenadas.
-                  </span>
+                <!-- Visualizador de Coordenadas Sincronizadas -->
+                <div class="p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs"
+                  :class="themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'"
+                >
+                  <div class="flex items-center gap-3 font-mono text-[11px]">
+                    <span class="text-slate-400">Lat: <strong class="text-foreground">{{ storeLat !== null ? storeLat.toFixed(6) : 'Não definida' }}</strong></span>
+                    <span class="text-slate-400">Lng: <strong class="text-foreground">{{ storeLng !== null ? storeLng.toFixed(6) : 'Não definida' }}</strong></span>
+                  </div>
+                  <div class="text-[11px]">
+                    <span v-if="storeLat && storeLng" class="text-emerald-500 font-semibold flex items-center gap-1">
+                      <CheckCircle2 class="w-3.5 h-3.5" /> Ponto no mapa sincronizado com as faixas de entrega
+                    </span>
+                    <span v-else class="text-amber-500 font-semibold">
+                      Informe o endereço ou selecione um ponto no mapa acima.
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

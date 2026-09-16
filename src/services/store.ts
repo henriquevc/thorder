@@ -2395,6 +2395,105 @@ export async function geocodeAddress(addressText: string): Promise<{ lat: number
   return null;
 }
 
+export interface AddressSuggestion {
+  displayName: string;
+  street: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  cep?: string;
+  lat: number;
+  lng: number;
+}
+
+// Autocomplete de endereços reais em tempo real (estilo iFood e Uber) via Nominatim
+export async function searchAddressSuggestions(query: string): Promise<AddressSuggestion[]> {
+  if (!query || query.trim().length < 3) return [];
+  try {
+    const encoded = encodeURIComponent(`${query.trim()}, Brasil`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=br&limit=6&q=${encoded}`, {
+      headers: { "User-Agent": "ThorderApp/1.0" }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((item: any) => {
+      const addr = item.address || {};
+      const street = addr.road || addr.street || addr.pedestrian || addr.footway || addr.avenue || "";
+      const number = addr.house_number || "";
+      const neighborhood = addr.suburb || addr.neighbourhood || addr.city_district || addr.quarter || "";
+      const city = addr.city || addr.town || addr.municipality || addr.village || "";
+      const state = addr.state || "";
+      const cep = addr.postcode ? addr.postcode.replace(/\D/g, "") : "";
+
+      return {
+        displayName: item.display_name,
+        street,
+        number: number || undefined,
+        neighborhood: neighborhood || undefined,
+        city: city || undefined,
+        state: state || undefined,
+        cep: cep || undefined,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon)
+      };
+    }).filter(item => !isNaN(item.lat) && !isNaN(item.lng));
+  } catch (e) {
+    console.error("Falha ao buscar sugestões de endereço:", e);
+    return [];
+  }
+}
+
+// Geocodificação reversa (ao arrastar o pino ou clicar no mapa, busca rua, número, bairro e cidade)
+export async function reverseGeocode(lat: number, lng: number): Promise<{
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  cep?: string;
+  formattedAddress?: string;
+} | null> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`, {
+      headers: { "User-Agent": "ThorderApp/1.0" }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || !data.address) return null;
+
+    const addr = data.address;
+    const street = addr.road || addr.street || addr.pedestrian || addr.footway || addr.avenue || "";
+    const number = addr.house_number || "";
+    const neighborhood = addr.suburb || addr.neighbourhood || addr.city_district || addr.quarter || "";
+    const city = addr.city || addr.town || addr.municipality || addr.village || "";
+    const state = addr.state || "";
+    const cep = addr.postcode ? addr.postcode.replace(/\D/g, "") : "";
+
+    let formatted = "";
+    if (street) formatted += street;
+    if (number) formatted += `, ${number}`;
+    if (neighborhood) formatted += ` - ${neighborhood}`;
+    if (city) formatted += `, ${city}`;
+    if (state) formatted += ` - ${state}`;
+
+    return {
+      street: street || undefined,
+      number: number || undefined,
+      neighborhood: neighborhood || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      cep: cep || undefined,
+      formattedAddress: formatted || data.display_name
+    };
+  } catch (e) {
+    console.error("Falha na geocodificação reversa:", e);
+    return null;
+  }
+}
+
 // Fórmula de Haversine para cálculo de distância precisa em linha reta (em km)
 export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Raio da Terra em km

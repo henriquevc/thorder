@@ -38,6 +38,19 @@ watch(cartCount, (newVal, oldVal) => {
   }
 })
 
+// Atualiza o document.title reativamente caso a loja mude ou carregue assincronamente
+watch(currentCompany, (newCompany) => {
+  if (newCompany?.name) {
+    if (route.meta?.title) {
+      document.title = `${route.meta.title} | ${newCompany.name}`
+    } else {
+      document.title = newCompany.name
+    }
+  } else if (!currentCompanySlug.value) {
+    document.title = 'Thorder | Plataforma Multi-Lojas'
+  }
+}, { immediate: true })
+
 // Função para verificar se a rota ativa é Admin
 const isAdminRoute = computed(() => {
   return route.path.startsWith('/admin')

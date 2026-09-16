@@ -626,7 +626,7 @@ const handleSubmitOrder = async () => {
         <Card v-if="selectedShipping" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex items-center gap-3">
           <Truck class="w-5 h-5 text-primary shrink-0" />
           <div class="text-xs">
-            <h5 class="font-bold text-slate-800">Entrega via {{ selectedShipping.carrier }}</h5>
+            <h5 class="font-bold text-slate-800">{{ selectedShipping.carrier.startsWith('Retirada') ? selectedShipping.carrier : 'Entrega: ' + selectedShipping.carrier }}</h5>
             <p class="text-slate-500 mt-0.5">Prazo estimado de entrega: {{ selectedShipping.deliveryDays }} {{ selectedShipping.deliveryDays === 1 ? 'dia útil' : 'dias úteis' }}.</p>
           </div>
         </Card>

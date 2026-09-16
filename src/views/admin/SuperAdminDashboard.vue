@@ -18,7 +18,8 @@ import {
   UserCheck,
   Check,
   Globe,
-  Pipette
+  Pipette,
+  KeyRound
 } from 'lucide-vue-next'
 import { 
   fetchPlatformStats, 
@@ -58,6 +59,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table'
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
 
 const emit = defineEmits<{
   (e: 'impersonate', slug: string): void
@@ -273,6 +275,15 @@ const handleDeleteUser = async (user: User) => {
   } catch (e: any) {
     alert(e.message || 'Falha ao excluir usuário.')
   }
+}
+
+// Estados e handlers para redefinição de senha de usuários
+const selectedUserForPasswordReset = ref<User | null>(null)
+const showResetUserPasswordModal = ref(false)
+
+const handleOpenResetUserPassword = (user: User) => {
+  selectedUserForPasswordReset.value = user
+  showResetUserPasswordModal.value = true
 }
 
 const handleImpersonate = async (slug: string) => {
@@ -673,15 +684,26 @@ const storeAdminsCount = computed(() => usersList.value.filter(u => u.role === '
 
                     <!-- Ações -->
                     <TableCell class="text-right">
-                      <Button 
-                        @click="handleDeleteUser(user)"
-                        variant="ghost" 
-                        size="icon" 
-                        class="h-8 w-8 text-red-500 hover:bg-red-500/10 rounded-xl"
-                        title="Excluir Usuário"
-                      >
-                        <Trash2 class="w-4 h-4" />
-                      </Button>
+                      <div class="flex items-center justify-end gap-1">
+                        <Button 
+                          @click="handleOpenResetUserPassword(user)"
+                          variant="ghost" 
+                          size="icon" 
+                          class="h-8 w-8 text-primary hover:bg-primary/10 rounded-xl"
+                          title="Redefinir Senha do Usuário"
+                        >
+                          <KeyRound class="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          @click="handleDeleteUser(user)"
+                          variant="ghost" 
+                          size="icon" 
+                          class="h-8 w-8 text-red-500 hover:bg-red-500/10 rounded-xl"
+                          title="Excluir Usuário"
+                        >
+                          <Trash2 class="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -1028,5 +1050,12 @@ const storeAdminsCount = computed(() => usersList.value.filter(u => u.role === '
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Modal de Redefinição de Senha de Usuário -->
+    <ChangePasswordModal 
+      :open="showResetUserPasswordModal" 
+      :target-user="selectedUserForPasswordReset"
+      @update:open="showResetUserPasswordModal = $event" 
+    />
   </div>
 </template>

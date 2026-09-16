@@ -10,7 +10,9 @@ import {
   ArrowLeft, 
   ChevronRight, 
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle,
+  Sparkles
 } from 'lucide-vue-next'
 import { 
   getCart, 
@@ -39,6 +41,10 @@ const isCalculatingShipping = ref(false)
 const shippingOptions = ref<ShippingOption[]>([])
 const selectedShipping = ref<ShippingOption | null>(null)
 const shippingError = ref('')
+
+const isBeyondRadius = computed(() => shippingOptions.value.some(o => o.isBeyondMaxRadius))
+const calculatedDistance = computed(() => shippingOptions.value.find(o => o.distanceKm !== undefined)?.distanceKm)
+const hasFreeShipping = computed(() => shippingOptions.value.some(o => o.freeShippingApplied))
 
 const formatCEP = (value: string) => {
   const clean = value.replace(/\D/g, '')
@@ -159,7 +165,7 @@ const handleCalculateShipping = () => {
   // Simula atraso na rede de 800ms para premium feel
   setTimeout(async () => {
     try {
-      const options = await calculateShipping(cleanCep)
+      const options = await calculateShipping(cleanCep, subtotal.value)
       shippingOptions.value = options
       // Seleciona a primeira opção por padrão (mais econômica)
       selectedShipping.value = options[0]
@@ -359,6 +365,20 @@ const handleGoToCheckout = () => {
             <div v-if="shippingError" class="text-xs text-red-500 flex items-center gap-1.5">
               <AlertTriangle class="w-4 h-4 animate-bounce" />
               <span>{{ shippingError }}</span>
+            </div>
+
+            <!-- Aviso de Fora do Raio de Entrega -->
+            <div v-if="isBeyondRadius" class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 text-xs flex items-start gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle class="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
+              <span>
+                Seu endereço está a aproximadamente <strong>{{ calculatedDistance }} km</strong> da loja, além do nosso raio máximo de entrega. Selecionamos a opção de <strong>Retirada na Loja</strong> para que você possa retirar seu pedido gratuitamente no balcão!
+              </span>
+            </div>
+
+            <!-- Badge de Frete Grátis -->
+            <div v-if="hasFreeShipping" class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-200">
+              <Sparkles class="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Parabéns! Seu pedido atingiu o valor mínimo para Frete Grátis na entrega local!</span>
             </div>
 
             <!-- Opções de Entrega Calculadas -->

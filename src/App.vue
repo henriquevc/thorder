@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   User,
   Store,
-  Lock
+  Lock,
+  KeyRound
 } from 'lucide-vue-next'
 import { 
   cartCount, 
@@ -19,9 +20,12 @@ import {
   logoutUser
 } from '@/services/store'
 import { Button } from '@/components/ui/button'
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
 
 const router = useRouter()
 const route = useRoute()
+
+const showChangePasswordModal = ref(false)
 
 // Animação de "bounce" temporária ao alterar contagem do carrinho
 const animateCart = ref(false)
@@ -148,6 +152,18 @@ const handleAdminLogout = () => {
               </div>
             </div>
 
+            <!-- Botão Trocar Senha -->
+            <Button 
+              variant="ghost" 
+              size="sm"
+              class="rounded-xl gap-1.5 font-bold text-xs hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground"
+              title="Alterar Minha Senha"
+              @click="showChangePasswordModal = true"
+            >
+              <KeyRound class="w-4 h-4" />
+              <span class="hidden md:inline">Trocar Senha</span>
+            </Button>
+
             <!-- Botão Sair -->
             <Button 
               variant="ghost" 
@@ -194,6 +210,12 @@ const handleAdminLogout = () => {
         </p>
       </div>
     </footer>
+
+    <!-- Modal Global de Troca de Senha -->
+    <ChangePasswordModal 
+      :open="showChangePasswordModal" 
+      @update:open="showChangePasswordModal = $event" 
+    />
   </div>
 </template>
 

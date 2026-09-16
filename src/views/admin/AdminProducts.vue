@@ -8,7 +8,9 @@ import {
   Loader2,
   AlertTriangle,
   UploadCloud,
+  Crop
 } from 'lucide-vue-next'
+import ImageCropperModal from '@/components/ImageCropperModal.vue'
 import { 
   fetchProducts, 
   createProduct, 
@@ -78,16 +80,20 @@ const formatPrice = (val: number) => {
   }).format(val)
 }
 
-// Captura de Arquivo e Conversão para Base64
+// Estado do Modal de Recorte
+const showCropperModal = ref(false)
+const cropperRawImage = ref('')
+
+// Captura de Arquivo e Abertura do Modal de Recorte
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   
   if (!file) return
   
-  // Limita o tamanho do arquivo a 1.5MB para evitar peso excessivo na string base64 no SQLite
-  if (file.size > 1.5 * 1024 * 1024) {
-    alert('A imagem é muito grande! Escolha um arquivo de no máximo 1.5MB.')
+  // Limite generoso de até 20MB para fotos brutas de smartphones
+  if (file.size > 20 * 1024 * 1024) {
+    alert('A imagem é muito grande! Escolha um arquivo de no máximo 20MB.')
     target.value = ''
     return
   }
@@ -95,10 +101,26 @@ const handleFileChange = (event: Event) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     const result = e.target?.result as string
-    formImageData.value = result
-    previewImage.value = result
+    cropperRawImage.value = result
+    showCropperModal.value = true
+    target.value = ''
   }
   reader.readAsDataURL(file)
+}
+
+// Callback do recorte concluído
+const handleCropComplete = (croppedBase64: string) => {
+  formImageData.value = croppedBase64
+  previewImage.value = croppedBase64
+  showCropperModal.value = false
+}
+
+// Reabrir recorte com a imagem atual
+const openReCrop = () => {
+  if (previewImage.value) {
+    cropperRawImage.value = previewImage.value
+    showCropperModal.value = true
+  }
 }
 
 // Reset do Formulário
@@ -111,6 +133,8 @@ const resetForm = () => {
   formStock.value = 0
   formImageData.value = ''
   previewImage.value = ''
+  cropperRawImage.value = ''
+  showCropperModal.value = false
   formError.value = ''
   isEditing.value = false
 }
@@ -410,7 +434,17 @@ const handleDeleteProduct = async (productId: number) => {
               <div class="md:col-span-1 aspect-square rounded-lg border overflow-hidden flex items-center justify-center relative group"
                 :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-250'"
               >
-                <img v-if="previewImage" :src="previewImage" class="w-full h-full object-cover" />
+                <template v-if="previewImage">
+                  <img :src="previewImage" class="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white text-[11px] font-bold cursor-pointer"
+                    @click="openReCrop"
+                  >
+                    <Crop class="w-5 h-5 text-primary" />
+                    <span>Recortar / Ajustar</span>
+                  </button>
+                </template>
                 <div v-else class="text-slate-700 flex flex-col items-center gap-1"
                   :class="themeMode === 'dark' ? 'text-slate-700' : 'text-slate-400'"
                 >
@@ -430,7 +464,7 @@ const handleDeleteProduct = async (productId: number) => {
                     <div class="flex flex-col items-center justify-center pt-2 pb-2">
                       <UploadCloud class="w-6 h-6 text-slate-500 mb-1" />
                       <p class="text-[10px] font-bold"><span class="text-primary">Clique para enviar</span> ou solte</p>
-                      <p class="text-[8px] text-slate-500 mt-0.5">PNG, JPG ou SVG (Máx. 1.5MB)</p>
+                      <p class="text-[8px] text-slate-500 mt-0.5">PNG, JPG ou WEBP (Até 20MB • Com Recorte HD)</p>
                     </div>
                     <input type="file" class="hidden" accept="image/*" @change="handleFileChange" />
                   </label>
@@ -471,5 +505,14 @@ const handleDeleteProduct = async (productId: number) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Modal de Recorte de Imagem -->
+    <ImageCropperModal
+      v-model:open="showCropperModal"
+      :image-src="cropperRawImage"
+      initial-aspect-ratio="1:1"
+      title="Ajustar Foto do Produto"
+      @crop="handleCropComplete"
+    />
   </div>
 </template>

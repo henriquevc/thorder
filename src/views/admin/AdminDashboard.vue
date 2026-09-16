@@ -31,8 +31,27 @@ import {
   CheckCheck,
   Pipette,
   Eye,
-  Contrast
+  Contrast,
+  Phone,
+  Mail,
+  Building,
+  Key,
+  KeyRound,
+  Hash,
+  Truck,
+  Route,
+  Search,
+  Navigation,
+  CheckCircle2,
+  Calculator,
+  Crop
 } from 'lucide-vue-next'
+import { 
+  type TipoChavePix, 
+  identificarTipoChavePix, 
+  formatarChavePix, 
+  validarChavePix 
+} from '@/services/pix'
 import { 
   fetchOrders, 
   fetchProducts, 
@@ -60,14 +79,24 @@ import {
   fetchUsers,
   createUser,
   deleteUser,
+  fetchDeliverySettings,
+  saveDeliverySettings,
+  geocodeCep,
+  geocodeAddress,
+  calculateDistanceKm,
   type Order, 
   type Product,
-  type User
+  type User,
+  type DeliverySettings,
+  type DeliveryTier,
+  DEFAULT_DELIVERY_TIERS
 } from '@/services/store'
 import SuperAdminDashboard from './SuperAdminDashboard.vue'
 import AdminProducts from './AdminProducts.vue'
 import AdminOrders from './AdminOrders.vue'
 import AdminCoupons from './AdminCoupons.vue'
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
+import ImageCropperModal from '@/components/ImageCropperModal.vue'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -93,12 +122,35 @@ const isConnecting = ref(false)
 const connectError = ref('')
 const connectSuccess = ref(false)
 
-// Configurações do Endereço e WhatsApp da Tabacaria
+// Configurações do Endereço e Entrega por Distância da Loja
+const storeCep = ref('')
 const storeAddress = ref('')
+const storeLat = ref<number | null>(null)
+const storeLng = ref<number | null>(null)
 const storeWhatsapp = ref('')
-const isSavingAddress = ref(false)
-const saveAddressSuccess = ref(false)
-const saveAddressError = ref('')
+const deliveryMaxRadiusKm = ref(15)
+const deliveryTiers = ref<DeliveryTier[]>([...DEFAULT_DELIVERY_TIERS])
+const deliveryFreeShippingMin = ref(0)
+const deliveryPickupEnabled = ref(true)
+
+const isSearchingStoreCep = ref(false)
+const isGeocodingAddress = ref(false)
+const isSavingDelivery = ref(false)
+const saveDeliverySuccess = ref(false)
+const saveDeliveryError = ref('')
+
+// Simulador de Frete no Painel
+const testSimulatorCep = ref('')
+const isSimulatingShipping = ref(false)
+const simulationResult = ref<{
+  distanceKm: number;
+  price: number;
+  matchedTier: DeliveryTier | null;
+  isWithinRadius: boolean;
+  freeShipping: boolean;
+  customerCity?: string;
+} | null>(null)
+const simulationError = ref('')
 
 // Configurações do Horário de Funcionamento
 const storeHoursEnabled = ref(false)
@@ -108,14 +160,32 @@ const isSavingHours = ref(false)
 const saveHoursSuccess = ref(false)
 const saveHoursError = ref('')
 
-// Configurações do Pix da Tabacaria
+// Configurações do Pix da Loja
 const storePixEnabled = ref(false)
+const storePixKeyType = ref<TipoChavePix>('celular')
 const storePixKey = ref('')
 const storePixName = ref('')
 const storePixCity = ref('Cajuru')
 const isSavingPix = ref(false)
 const savePixSuccess = ref(false)
 const savePixError = ref('')
+
+const pixKeyValidation = computed(() => {
+  if (!storePixKey.value.trim()) return { valida: true, erro: '', formatada: '' }
+  return validarChavePix(storePixKey.value, storePixKeyType.value)
+})
+
+const pixFormattedPreview = computed(() => {
+  if (!storePixKey.value.trim()) return ''
+  return formatarChavePix(storePixKey.value, storePixKeyType.value)
+})
+
+const selectPixKeyType = (type: TipoChavePix) => {
+  storePixKeyType.value = type
+  if (storePixKey.value.trim()) {
+    storePixKey.value = formatarChavePix(storePixKey.value, type)
+  }
+}
 
 // Carrega as credenciais existentes se houver
 const currentConfig = getTursoConfig()
@@ -166,41 +236,183 @@ const handleDisconnect = () => {
 }
 
 // Salvar Configurações Locais (Endereço e WhatsApp)
-const handleSaveSettings = async () => {
+// Busca endereço e coordenadas pelo CEP da loja
+const handleSearchStoreCep = async () => {
+  const clean = storeCep.value.replace(/\D/g, '')
+  if (clean.length !== 8) {
+    saveDeliveryError.value = 'Digite um CEP válido com 8 dígitos para a loja.'
+    return
+  }
+  isSearchingStoreCep.value = true
+  saveDeliveryError.value = ''
+  try {
+    const geo = await geocodeCep(clean)
+    if (geo) {
+      storeLat.value = geo.lat
+      storeLng.value = geo.lng
+      if (geo.address && (!storeAddress.value || storeAddress.value.length < 5)) {
+        storeAddress.value = `${geo.address}${geo.city ? ', ' + geo.city : ''}${geo.state ? ' - ' + geo.state : ''}`
+      }
+    } else {
+      saveDeliveryError.value = 'Não foi possível encontrar as coordenadas automaticamente por este CEP. Verifique o CEP ou digite o endereço completo.'
+    }
+  } catch (err: any) {
+    saveDeliveryError.value = err.message || 'Erro ao buscar CEP da loja.'
+  } finally {
+    isSearchingStoreCep.value = false
+  }
+}
+
+// Geocodifica o endereço completo digitado
+const handleGeocodeStoreAddress = async () => {
+  if (!storeAddress.value.trim() && !storeCep.value.trim()) {
+    saveDeliveryError.value = 'Preencha o endereço ou o CEP para buscar as coordenadas.'
+    return
+  }
+  isGeocodingAddress.value = true
+  saveDeliveryError.value = ''
+  try {
+    let geo = await geocodeAddress(storeAddress.value)
+    if (!geo && storeCep.value) {
+      geo = await geocodeCep(storeCep.value)
+    }
+    if (geo) {
+      storeLat.value = geo.lat
+      storeLng.value = geo.lng
+    } else {
+      saveDeliveryError.value = 'Coordenadas não encontradas para este endereço. Tente informar rua, número, cidade e estado.'
+    }
+  } catch (err: any) {
+    saveDeliveryError.value = err.message || 'Erro ao obter coordenadas.'
+  } finally {
+    isGeocodingAddress.value = false
+  }
+}
+
+// Adicionar nova faixa de entrega
+const handleAddDeliveryTier = () => {
+  const last = deliveryTiers.value[deliveryTiers.value.length - 1]
+  const nextKm = last ? Math.round((last.maxKm + 4) * 10) / 10 : 3
+  const nextPrice = last ? Math.round((last.price + 3) * 100) / 100 : 5
+  deliveryTiers.value.push({ maxKm: nextKm, price: nextPrice })
+  deliveryTiers.value.sort((a, b) => a.maxKm - b.maxKm)
+}
+
+// Remover faixa de entrega
+const handleRemoveDeliveryTier = (index: number) => {
+  if (deliveryTiers.value.length <= 1) {
+    alert('Você deve manter ao menos uma faixa de entrega cadastrada.')
+    return
+  }
+  deliveryTiers.value.splice(index, 1)
+}
+
+// Salvar Configurações de Entrega & Endereço
+const handleSaveDelivery = async () => {
   if (!storeAddress.value.trim()) {
-    saveAddressError.value = 'O endereço não pode ser vazio.'
+    saveDeliveryError.value = 'O endereço da loja não pode ser vazio.'
     return
   }
   if (!storeWhatsapp.value.trim()) {
-    saveAddressError.value = 'O WhatsApp não pode ser vazio.'
+    saveDeliveryError.value = 'O WhatsApp para pedidos não pode ser vazio.'
     return
   }
-  
-  isSavingAddress.value = true
-  saveAddressError.value = ''
-  saveAddressSuccess.value = false
-  
+  if (deliveryTiers.value.length === 0) {
+    saveDeliveryError.value = 'Cadastre ao menos uma faixa de raio para entrega.'
+    return
+  }
+
+  isSavingDelivery.value = true
+  saveDeliveryError.value = ''
+  saveDeliverySuccess.value = false
+
   try {
     const cleanWhatsapp = storeWhatsapp.value.replace(/\D/g, '')
     if (cleanWhatsapp.length < 10) {
       throw new Error('Por favor, insira um número de WhatsApp válido com DDD (ex: 16999999999).')
     }
-    
-    await Promise.all([
-      saveSetting('store_address', storeAddress.value.trim()),
-      saveSetting('store_whatsapp', cleanWhatsapp)
-    ])
-    
+
+    // Se ainda não tiver coordenadas, tenta buscar automaticamente antes de salvar
+    if (!storeLat.value || !storeLng.value) {
+      if (storeCep.value) {
+        const geo = await geocodeCep(storeCep.value)
+        if (geo) {
+          storeLat.value = geo.lat
+          storeLng.value = geo.lng
+        }
+      }
+    }
+
+    await saveDeliverySettings({
+      storeCep: storeCep.value,
+      storeAddress: storeAddress.value.trim(),
+      storeLat: storeLat.value,
+      storeLng: storeLng.value,
+      storeWhatsapp: cleanWhatsapp,
+      maxRadiusKm: Number(deliveryMaxRadiusKm.value) || 15,
+      tiers: deliveryTiers.value,
+      freeShippingMin: Number(deliveryFreeShippingMin.value) || 0,
+      pickupEnabled: deliveryPickupEnabled.value
+    })
+
     storeWhatsapp.value = cleanWhatsapp
-    
-    saveAddressSuccess.value = true
+    saveDeliverySuccess.value = true
     setTimeout(() => {
-      saveAddressSuccess.value = false
-    }, 2000)
-  } catch (e: any) {
-    saveAddressError.value = e.message || 'Falha ao salvar as configurações no banco de dados.'
+      saveDeliverySuccess.value = false
+    }, 2500)
+  } catch (err: any) {
+    saveDeliveryError.value = err.message || 'Falha ao salvar configurações de entrega.'
   } finally {
-    isSavingAddress.value = false
+    isSavingDelivery.value = false
+  }
+}
+
+// Simular Frete no Painel Admin
+const handleSimulateShipping = async () => {
+  const clean = testSimulatorCep.value.replace(/\D/g, '')
+  if (clean.length !== 8) {
+    simulationError.value = 'Digite um CEP com 8 dígitos para testar.'
+    simulationResult.value = null
+    return
+  }
+  if (!storeLat.value || !storeLng.value) {
+    simulationError.value = 'Defina e salve as coordenadas da loja antes de simular o frete.'
+    simulationResult.value = null
+    return
+  }
+
+  isSimulatingShipping.value = true
+  simulationError.value = ''
+  simulationResult.value = null
+
+  try {
+    const customerGeo = await geocodeCep(clean)
+    if (!customerGeo) {
+      throw new Error('Não foi possível obter a localização para este CEP de teste.')
+    }
+    const dist = calculateDistanceKm(storeLat.value, storeLng.value, customerGeo.lat, customerGeo.lng)
+    const isWithin = dist <= deliveryMaxRadiusKm.value
+
+    const sorted = [...deliveryTiers.value].sort((a, b) => a.maxKm - b.maxKm)
+    let matched = sorted.find(t => dist <= t.maxKm) || null
+    if (!matched && sorted.length > 0 && isWithin) {
+      matched = sorted[sorted.length - 1]
+    }
+
+    const price = matched ? matched.price : 0
+
+    simulationResult.value = {
+      distanceKm: dist,
+      price,
+      matchedTier: matched,
+      isWithinRadius: isWithin,
+      freeShipping: false,
+      customerCity: customerGeo.city ? `${customerGeo.city} - ${customerGeo.state || ''}` : undefined
+    }
+  } catch (err: any) {
+    simulationError.value = err.message || 'Erro ao simular frete.'
+  } finally {
+    isSimulatingShipping.value = false
   }
 }
 
@@ -240,6 +452,11 @@ const handleSavePix = async () => {
       savePixError.value = 'A Chave Pix não pode ser vazia se o Pix estiver ativado.'
       return
     }
+    const val = validarChavePix(storePixKey.value, storePixKeyType.value)
+    if (!val.valida) {
+      savePixError.value = val.erro || 'A chave Pix informada não é válida para o tipo selecionado.'
+      return
+    }
     if (!storePixName.value.trim()) {
       savePixError.value = 'O Nome do Beneficiário não pode ser vazio se o Pix estiver ativado.'
       return
@@ -253,11 +470,15 @@ const handleSavePix = async () => {
   isSavingPix.value = true
   savePixError.value = ''
   savePixSuccess.value = false
+
+  const chaveFormatada = formatarChavePix(storePixKey.value, storePixKeyType.value)
+  storePixKey.value = chaveFormatada
   
   try {
     await Promise.all([
       saveSetting('store_pix_enabled', storePixEnabled.value ? 'true' : 'false'),
-      saveSetting('store_pix_key', storePixKey.value.trim()),
+      saveSetting('store_pix_key', chaveFormatada),
+      saveSetting('store_pix_key_type', storePixKeyType.value),
       saveSetting('store_pix_name', storePixName.value.trim()),
       saveSetting('store_pix_city', storePixCity.value.trim())
     ])
@@ -265,7 +486,7 @@ const handleSavePix = async () => {
     savePixSuccess.value = true
     setTimeout(() => {
       savePixSuccess.value = false
-    }, 2000)
+    }, 2500)
   } catch (e: any) {
     savePixError.value = e.message || 'Falha ao salvar as configurações de Pix no banco de dados.'
   } finally {
@@ -277,23 +498,34 @@ const loadStoreData = async () => {
   isLoadingStats.value = true
   try {
     // Carrega estatísticas da loja ativa em paralelo
-    const [orders, products, address, whatsapp, hoursEnabled, openTime, closeTime, pixEnabled, pixKey, pixName, pixCity] = await Promise.all([
+    const [
+      orders, products, deliverySettings,
+      hoursEnabled, openTime, closeTime, 
+      pixEnabled, pixKey, pixName, pixCity, pixKeyType
+    ] = await Promise.all([
       fetchOrders(),
       fetchProducts(),
-      fetchSetting('store_address', 'Rua Marechal Deodoro, 150 - Centro, Cajuru - SP'),
-      fetchSetting('store_whatsapp', '5516999999999'),
+      fetchDeliverySettings(),
       fetchSetting('store_hours_enabled', 'false'),
       fetchSetting('store_open_time', '18:00'),
       fetchSetting('store_close_time', '23:59'),
       fetchSetting('store_pix_enabled', 'false'),
       fetchSetting('store_pix_key', ''),
       fetchSetting('store_pix_name', ''),
-      fetchSetting('store_pix_city', 'Cajuru')
+      fetchSetting('store_pix_city', 'Cajuru'),
+      fetchSetting('store_pix_key_type', '')
     ])
     ordersList.value = orders
     productsList.value = products
-    storeAddress.value = address
-    storeWhatsapp.value = whatsapp
+    storeCep.value = deliverySettings.storeCep
+    storeAddress.value = deliverySettings.storeAddress
+    storeLat.value = deliverySettings.storeLat
+    storeLng.value = deliverySettings.storeLng
+    storeWhatsapp.value = deliverySettings.storeWhatsapp
+    deliveryMaxRadiusKm.value = deliverySettings.maxRadiusKm
+    deliveryTiers.value = deliverySettings.tiers
+    deliveryFreeShippingMin.value = deliverySettings.freeShippingMin
+    deliveryPickupEnabled.value = deliverySettings.pickupEnabled
     storeHoursEnabled.value = hoursEnabled === 'true'
     storeOpenTime.value = openTime
     storeCloseTime.value = closeTime
@@ -301,6 +533,11 @@ const loadStoreData = async () => {
     storePixKey.value = pixKey
     storePixName.value = pixName
     storePixCity.value = pixCity
+    if (pixKeyType && ['celular', 'cpf', 'cnpj', 'email', 'aleatoria'].includes(pixKeyType)) {
+      storePixKeyType.value = pixKeyType as TipoChavePix
+    } else if (pixKey) {
+      storePixKeyType.value = identificarTipoChavePix(pixKey)
+    }
 
     if (currentCompany.value) {
       companyNameEdit.value = currentCompany.value.name
@@ -431,22 +668,39 @@ const compressImage = (file: File, maxWidth = 512, maxHeight = 512, quality = 0.
   })
 }
 
-const handleLogoChange = async (event: Event) => {
+const showLogoCropperModal = ref(false)
+const logoCropperRawImage = ref('')
+
+const handleLogoChange = (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
 
-  isCompressingLogo.value = true
-  saveCompanyError.value = ''
-  try {
-    const compressed = await compressImage(file, 512, 512, 0.85)
-    companyLogoEdit.value = compressed
-  } catch (err: any) {
-    console.error('Erro ao processar imagem:', err)
-    saveCompanyError.value = 'Falha ao processar a imagem selecionada.'
-  } finally {
-    isCompressingLogo.value = false
+  if (file.size > 20 * 1024 * 1024) {
+    saveCompanyError.value = 'A imagem é muito grande! Escolha um arquivo de no máximo 20MB.'
     target.value = ''
+    return
+  }
+
+  saveCompanyError.value = ''
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    logoCropperRawImage.value = e.target?.result as string
+    showLogoCropperModal.value = true
+    target.value = ''
+  }
+  reader.readAsDataURL(file)
+}
+
+const handleLogoCropComplete = (croppedBase64: string) => {
+  companyLogoEdit.value = croppedBase64
+  showLogoCropperModal.value = false
+}
+
+const openLogoReCrop = () => {
+  if (companyLogoEdit.value) {
+    logoCropperRawImage.value = companyLogoEdit.value
+    showLogoCropperModal.value = true
   }
 }
 
@@ -560,6 +814,16 @@ const handleDeleteStoreUser = async (user: User) => {
   } catch (e: any) {
     alert(e.message || 'Erro ao remover usuário.')
   }
+}
+
+// Estados e handlers para troca/redefinição de senha
+const showChangePasswordModal = ref(false)
+const selectedUserForPasswordReset = ref<User | null>(null)
+const showResetUserPasswordModal = ref(false)
+
+const handleOpenResetStoreUserPassword = (user: User) => {
+  selectedUserForPasswordReset.value = user
+  showResetUserPasswordModal.value = true
 }
 
 const handleSetThemeColor = async (color: string) => {
@@ -905,17 +1169,28 @@ const formatPrice = (val: number) => {
                 <div class="space-y-2 flex-1">
                   <div class="flex flex-wrap items-center gap-2.5">
                     <label class="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all">
-                      <Loader2 v-if="isCompressingLogo" class="w-4 h-4 animate-spin" />
-                      <UploadCloud v-else class="w-4 h-4" />
-                      <span>{{ isCompressingLogo ? 'Otimizando Imagem...' : (companyLogoEdit ? 'Alterar Foto' : 'Enviar Foto da Loja') }}</span>
+                      <UploadCloud class="w-4 h-4" />
+                      <span>{{ companyLogoEdit ? 'Alterar Foto' : 'Enviar Foto da Loja' }}</span>
                       <input 
                         type="file" 
                         accept="image/png, image/jpeg, image/webp, image/svg+xml" 
                         class="hidden" 
-                        :disabled="isCompressingLogo"
                         @change="handleLogoChange" 
                       />
                     </label>
+
+                    <Button 
+                      v-if="companyLogoEdit"
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      class="rounded-xl text-xs font-bold flex items-center gap-1.5"
+                      :class="themeMode === 'dark' ? 'border-slate-800 hover:bg-slate-800 text-slate-200' : 'border-slate-200 hover:bg-slate-100 text-slate-700'"
+                      @click="openLogoReCrop"
+                    >
+                      <Crop class="w-3.5 h-3.5 text-primary" />
+                      <span>Ajustar Corte</span>
+                    </Button>
 
                     <Button 
                       v-if="companyLogoEdit"
@@ -930,7 +1205,7 @@ const formatPrice = (val: number) => {
                     </Button>
                   </div>
                   <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Selecione a logo ou foto representativa do seu estabelecimento. O arquivo é automaticamente redimensionado e comprimido para carregamento instantâneo no catálogo e cabeçalho.
+                    Selecione a logo ou foto do seu estabelecimento (até 20MB). O arquivo pode ser recortado, rotacionado e salvo em WebP de alta definição com carregamento instantâneo.
                   </p>
                 </div>
               </div>
@@ -1172,10 +1447,20 @@ const formatPrice = (val: number) => {
                   </div>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
                     {{ u.role === 'superadmin' ? 'Super Admin' : 'Lojista' }}
                   </span>
+
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    class="h-7 w-7 text-primary hover:bg-primary/10 rounded-lg"
+                    @click="handleOpenResetStoreUserPassword(u)"
+                    title="Redefinir Senha do Usuário"
+                  >
+                    <Key class="w-3.5 h-3.5" />
+                  </Button>
 
                   <Button 
                     variant="ghost" 
@@ -1270,6 +1555,36 @@ const formatPrice = (val: number) => {
               </DialogContent>
             </Dialog>
           </CardContent>
+        </Card>
+
+        <!-- 0.6 SEGURANÇA & SENHA DE ACESSO -->
+        <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
+          :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
+        >
+          <CardHeader class="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+            :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'"
+          >
+            <div>
+              <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+                :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+              >
+                <ShieldCheck class="w-5 h-5 text-primary" />
+                <span>Segurança &amp; Senha de Acesso</span>
+              </CardTitle>
+              <p class="text-slate-400 text-xs mt-1">
+                Altere a sua senha de acesso a este painel administrativo a qualquer momento para garantir a segurança da loja.
+              </p>
+            </div>
+
+            <Button 
+              type="button"
+              @click="showChangePasswordModal = true"
+              class="rounded-xl font-bold text-xs bg-primary text-primary-foreground flex items-center gap-1.5 shadow-md shadow-primary/20 shrink-0 self-start sm:self-auto"
+            >
+              <KeyRound class="w-4 h-4" />
+              <span>Alterar Minha Senha</span>
+            </Button>
+          </CardHeader>
         </Card>
 
         <!-- 1. PERSONALIZAÇÃO VISUAL, CORES & ACESSIBILIDADE -->
@@ -1517,77 +1832,355 @@ const formatPrice = (val: number) => {
         </Card>
 
         <!-- 2. ENDEREÇO E WHATSAPP DA TABACARIA -->
+        <!-- CONFIGURAÇÕES DE ENTREGA & ENDEREÇO DA LOJA -->
         <Card class="rounded-2xl shadow-xl transition-colors duration-300 relative overflow-hidden"
           :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900' : 'bg-white border-slate-200'"
         >
           <CardHeader class="border-b pb-4" :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'">
-            <CardTitle class="text-xl font-extrabold flex items-center gap-2"
-              :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
-            >
-              <MapPin class="w-5 h-5 text-primary" />
-              Configurações de Retirada &amp; WhatsApp
-            </CardTitle>
-            <p class="text-slate-400 text-xs mt-1">
-              Configure o endereço físico e o número de WhatsApp receptor de pedidos da sua loja. O endereço será exibido para os clientes que escolherem a opção de Retirada, e o WhatsApp receberá os detalhes estruturados de cada pedido. Os dados são salvos diretamente no banco de dados Turso.
-            </p>
+            <div class="flex items-center justify-between">
+              <div>
+                <CardTitle class="text-xl font-extrabold flex items-center gap-2"
+                  :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+                >
+                  <Truck class="w-5 h-5 text-primary" />
+                  Configurações de Entrega &amp; Endereço da Loja
+                </CardTitle>
+                <p class="text-slate-400 text-xs mt-1">
+                  Defina o endereço físico da loja com coordenadas GPS e estabeleça faixas de preço de entrega baseadas na distância real (em km) até o cliente, sem restrições municipais.
+                </p>
+              </div>
+
+              <!-- Badge de Status GPS -->
+              <div class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+                :class="storeLat && storeLng ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'"
+              >
+                <span class="w-2 h-2 rounded-full" :class="storeLat && storeLng ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                <span>{{ storeLat && storeLng ? 'GPS Ativo' : 'GPS Pendente' }}</span>
+              </div>
+            </div>
           </CardHeader>
           
-          <CardContent class="p-6 space-y-5">
-            <!-- Endereço Completo -->
-            <div class="space-y-2">
-              <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
-                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-              >Endereço Completo da Tabacaria</label>
-              <Input 
-                v-model="storeAddress" 
-                placeholder="Ex: Rua Marechal Deodoro, 150 - Centro, Cajuru - SP" 
-                class="rounded-xl focus:ring-primary w-full"
-                :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
-                @keyup.enter="handleSaveSettings"
-              />
-              <p class="text-[10px] text-slate-500">Inclua rua, número, bairro, cidade e estado para facilitar a localização do cliente.</p>
+          <CardContent class="p-6 space-y-6">
+            <!-- 1. ENDEREÇO E COORDENADAS -->
+            <div class="space-y-4">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <MapPin class="w-4 h-4" />
+                <span>1. Localização Física da Loja</span>
+              </h4>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- CEP da Loja -->
+                <div class="space-y-1.5">
+                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">CEP da Loja *</label>
+                  <div class="flex gap-2">
+                    <Input 
+                      v-model="storeCep" 
+                      placeholder="14240-000" 
+                      class="rounded-xl font-mono text-xs focus:ring-primary"
+                      :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                      @keyup.enter="handleSearchStoreCep"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      class="rounded-xl shrink-0 font-bold text-xs"
+                      :disabled="isSearchingStoreCep"
+                      @click="handleSearchStoreCep"
+                      title="Buscar coordenadas pelo CEP"
+                    >
+                      <Loader2 v-if="isSearchingStoreCep" class="w-4 h-4 animate-spin" />
+                      <Search v-else class="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p class="text-[10px] text-slate-400">Clique na lupa para preencher endereço e coordenadas.</p>
+                </div>
+
+                <!-- WhatsApp de Pedidos -->
+                <div class="space-y-1.5 md:col-span-2">
+                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">WhatsApp para Receber Pedidos *</label>
+                  <Input 
+                    v-model="storeWhatsapp" 
+                    placeholder="Ex: 5516999999999" 
+                    class="rounded-xl font-mono text-xs focus:ring-primary"
+                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                  />
+                  <p class="text-[10px] text-slate-400">Número com código do país (55) e DDD. Ex: 5516999999999.</p>
+                </div>
+              </div>
+
+              <!-- Endereço Completo -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Endereço Completo (Rua, Número, Bairro, Cidade - UF) *</label>
+                <div class="flex gap-2">
+                  <Input 
+                    v-model="storeAddress" 
+                    placeholder="Ex: Rua Marechal Deodoro, 150 - Centro, Cajuru - SP" 
+                    class="rounded-xl focus:ring-primary w-full text-xs"
+                    :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    class="rounded-xl shrink-0 font-bold text-xs flex items-center gap-1.5"
+                    :disabled="isGeocodingAddress"
+                    @click="handleGeocodeStoreAddress"
+                    title="Recalcular coordenadas a partir do texto do endereço"
+                  >
+                    <Loader2 v-if="isGeocodingAddress" class="w-4 h-4 animate-spin" />
+                    <Navigation v-else class="w-4 h-4" />
+                    <span class="hidden sm:inline">GPS</span>
+                  </Button>
+                </div>
+              </div>
+
+              <!-- Visualizador de Coordenadas -->
+              <div class="p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs"
+                :class="themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="text-slate-400 font-mono text-[11px]">Latitude: <strong class="text-foreground">{{ storeLat !== null ? storeLat.toFixed(6) : 'Não definida' }}</strong></span>
+                  <span class="text-slate-400 font-mono text-[11px]">Longitude: <strong class="text-foreground">{{ storeLng !== null ? storeLng.toFixed(6) : 'Não definida' }}</strong></span>
+                </div>
+                <div class="text-[11px] text-slate-400">
+                  <span v-if="storeLat && storeLng" class="text-emerald-500 font-semibold flex items-center gap-1">
+                    <CheckCircle2 class="w-3.5 h-3.5" /> Coordenadas sincronizadas para cálculo do raio
+                  </span>
+                  <span v-else class="text-amber-500 font-semibold">
+                    Informe o CEP e clique na lupa para calcular as coordenadas.
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <!-- WhatsApp Receptor de Pedidos -->
-            <div class="space-y-2">
-              <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
-                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-              >WhatsApp para Receber Pedidos</label>
-              <Input 
-                v-model="storeWhatsapp" 
-                placeholder="Ex: 5516999999999" 
-                class="rounded-xl focus:ring-primary w-full"
-                :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
-                @keyup.enter="handleSaveSettings"
-              />
-              <p class="text-[10px] text-slate-550">
-                Insira o número completo com código do país (55 para Brasil) e DDD, apenas números. Ex: <strong class="text-primary font-bold">5516999999999</strong>.
+            <hr :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'" />
+
+            <!-- 2. FAIXAS DE RAIO E VALORES DE ENTREGA -->
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <Route class="w-4 h-4" />
+                    <span>2. Faixas de Preço por Raio / Distância</span>
+                  </h4>
+                  <p class="text-slate-400 text-xs mt-0.5">
+                    O valor da entrega aumenta gradualmente conforme o cliente fica mais distante da loja.
+                  </p>
+                </div>
+
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline"
+                  class="rounded-xl font-bold text-xs flex items-center gap-1.5"
+                  @click="handleAddDeliveryTier"
+                >
+                  <Plus class="w-3.5 h-3.5" />
+                  <span>Adicionar Faixa</span>
+                </Button>
+              </div>
+
+              <!-- Lista de Faixas de Entrega -->
+              <div class="space-y-2.5">
+                <div 
+                  v-for="(tier, idx) in deliveryTiers" 
+                  :key="idx"
+                  class="flex items-center gap-3 p-3 rounded-2xl border transition-all"
+                  :class="themeMode === 'dark' ? 'bg-slate-950/40 border-slate-800 hover:border-slate-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'"
+                >
+                  <div class="w-7 h-7 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                    #{{ idx + 1 }}
+                  </div>
+
+                  <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Distância Máxima -->
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-slate-400 whitespace-nowrap">Até:</span>
+                      <div class="relative flex-1">
+                        <Input 
+                          v-model.number="tier.maxKm" 
+                          type="number" 
+                          step="0.5" 
+                          min="0.1" 
+                          required 
+                          class="rounded-xl text-xs font-bold pl-3 pr-10"
+                        />
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-bold pointer-events-none">km</span>
+                      </div>
+                    </div>
+
+                    <!-- Valor da Taxa -->
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-slate-400 whitespace-nowrap">Taxa:</span>
+                      <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">R$</span>
+                        <Input 
+                          v-model.number="tier.price" 
+                          type="number" 
+                          step="0.50" 
+                          min="0" 
+                          required 
+                          class="rounded-xl text-xs font-bold pl-8 pr-3"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Botão Excluir Faixa -->
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    class="h-8 w-8 text-red-500 hover:bg-red-500/10 rounded-xl shrink-0"
+                    :disabled="deliveryTiers.length <= 1"
+                    @click="handleRemoveDeliveryTier(idx)"
+                    title="Remover Faixa"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <!-- Regras Globais de Raio & Retirada -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <!-- Raio Máximo -->
+                <div class="space-y-1.5 p-3.5 rounded-2xl border"
+                  :class="themeMode === 'dark' ? 'bg-slate-950/30 border-slate-800' : 'bg-slate-50 border-slate-200'"
+                >
+                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Raio Máximo de Entrega (km) *</label>
+                  <div class="relative">
+                    <Input 
+                      v-model.number="deliveryMaxRadiusKm" 
+                      type="number" 
+                      step="1" 
+                      min="1" 
+                      class="rounded-xl font-bold pr-10 text-xs"
+                    />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-bold pointer-events-none">km</span>
+                  </div>
+                  <p class="text-[10px] text-slate-400">Acima desta distância a entrega é bloqueada (apenas retirada).</p>
+                </div>
+
+                <!-- Frete Grátis Promocional -->
+                <div class="space-y-1.5 p-3.5 rounded-2xl border"
+                  :class="themeMode === 'dark' ? 'bg-slate-950/30 border-slate-800' : 'bg-slate-50 border-slate-200'"
+                >
+                  <label class="text-xs font-semibold" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Frete Grátis a partir de (R$)</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold pointer-events-none">R$</span>
+                    <Input 
+                      v-model.number="deliveryFreeShippingMin" 
+                      type="number" 
+                      step="5" 
+                      min="0" 
+                      placeholder="0 para desativar"
+                      class="rounded-xl font-bold pl-8 pr-3 text-xs"
+                    />
+                  </div>
+                  <p class="text-[10px] text-slate-400">Coloque 0 para desativar. Dentro do raio, o frete sairá grátis.</p>
+                </div>
+              </div>
+
+              <!-- Retirada no Balcão -->
+              <div class="flex items-center gap-3 p-3.5 rounded-2xl border"
+                :class="themeMode === 'dark' ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'"
+              >
+                <input 
+                  id="pickup-enabled-checkbox"
+                  v-model="deliveryPickupEnabled" 
+                  type="checkbox"
+                  class="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
+                />
+                <label for="pickup-enabled-checkbox" class="text-xs font-bold cursor-pointer select-none">
+                  Habilitar opção "Retirada na Loja" (grátis para o cliente retirar no balcão)
+                </label>
+              </div>
+            </div>
+
+            <hr :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'" />
+
+            <!-- 3. SIMULADOR DE FRETE INTERNO -->
+            <div class="p-4 rounded-2xl border space-y-3"
+              :class="themeMode === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'"
+            >
+              <div class="flex items-center gap-2">
+                <Calculator class="w-4 h-4 text-primary" />
+                <h5 class="text-xs font-bold uppercase tracking-wider text-slate-300">Simulador de Frete da Loja</h5>
+              </div>
+              <p class="text-[11px] text-slate-400">
+                Digite um CEP de teste para simular a distância real calculada da loja e o valor de entrega que o cliente visualizará no catálogo.
               </p>
+
+              <div class="flex gap-2 max-w-sm">
+                <Input 
+                  v-model="testSimulatorCep" 
+                  placeholder="Ex: 14240000 ou 14000000" 
+                  class="rounded-xl text-xs font-mono"
+                  @keyup.enter="handleSimulateShipping"
+                />
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="outline" 
+                  class="rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5"
+                  :disabled="isSimulatingShipping"
+                  @click="handleSimulateShipping"
+                >
+                  <Loader2 v-if="isSimulatingShipping" class="w-3.5 h-3.5 animate-spin" />
+                  <Calculator v-else class="w-3.5 h-3.5" />
+                  <span>Simular</span>
+                </Button>
+              </div>
+
+              <div v-if="simulationError" class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                {{ simulationError }}
+              </div>
+
+              <div v-if="simulationResult" class="p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in duration-200"
+                :class="simulationResult.isWithinRadius ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'"
+              >
+                <div class="flex items-center justify-between font-bold text-sm">
+                  <span>Distância Calculada: {{ simulationResult.distanceKm }} km</span>
+                  <span v-if="simulationResult.isWithinRadius" class="text-primary font-black text-base">
+                    Taxa: R$ {{ simulationResult.price.toFixed(2) }}
+                  </span>
+                  <span v-else class="text-amber-400 font-black">
+                    Fora do Raio Máximo ({{ deliveryMaxRadiusKm }} km)
+                  </span>
+                </div>
+                <div class="text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>{{ simulationResult.customerCity || 'Localização obtida via CEP' }}</span>
+                  <span v-if="simulationResult.matchedTier">Faixa aplicada: até {{ simulationResult.matchedTier.maxKm }} km</span>
+                  <span v-else-if="!simulationResult.isWithinRadius">Apenas Retirada na Loja disponível</span>
+                </div>
+              </div>
             </div>
 
-            <!-- Feedbacks -->
-            <div v-if="saveAddressError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
+            <!-- Feedbacks de Salvamento -->
+            <div v-if="saveDeliveryError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
               <AlertTriangle class="w-4 h-4 shrink-0" />
-              <span>{{ saveAddressError }}</span>
+              <span>{{ saveDeliveryError }}</span>
             </div>
 
-            <div v-if="saveAddressSuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
+            <div v-if="saveDeliverySuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
               <Check class="w-4 h-4 shrink-0" />
-              <span>Configurações locais atualizadas com sucesso no banco de dados Turso!</span>
+              <span>Configurações de entrega e localização salvas com sucesso no banco de dados!</span>
             </div>
 
             <!-- Ações -->
-            <div class="flex justify-end pt-2 border-t"
+            <div class="flex justify-end pt-3 border-t"
               :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-150'"
             >
               <Button 
                 size="sm"
-                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-                :disabled="isSavingAddress"
-                @click="handleSaveSettings"
+                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 flex items-center gap-1.5"
+                :disabled="isSavingDelivery"
+                @click="handleSaveDelivery"
               >
-                <Loader2 v-if="isSavingAddress" class="w-4 h-4 animate-spin mr-1.5" />
-                {{ isSavingAddress ? 'Salvando...' : 'Salvar Configurações' }}
+                <Loader2 v-if="isSavingDelivery" class="w-4 h-4 animate-spin" />
+                <Truck v-else class="w-4 h-4" />
+                <span>{{ isSavingDelivery ? 'Salvando Configurações...' : 'Salvar Configurações de Entrega' }}</span>
               </Button>
             </div>
           </CardContent>
@@ -1701,73 +2294,221 @@ const formatPrice = (val: number) => {
               Recebimento via Pix (Gratuito)
             </CardTitle>
             <p class="text-slate-400 text-xs mt-1">
-              Habilite a exibição automática de um QR Code Pix e do código "Copia e Cola" com o valor exato do pedido na tela de sucesso de compra. O cliente poderá pagar e depois enviar o comprovante via WhatsApp.
+              Gera automaticamente o QR Code Pix estático com o valor exato do pedido e o código Copia e Cola 100% compatível com todos os bancos (Nubank, Itaú, Bradesco, BB, etc.).
             </p>
           </CardHeader>
           
           <CardContent class="p-6 space-y-5">
             <!-- Switch Habilitar Pix -->
-            <div class="flex items-center gap-3 p-3 rounded-xl border"
+            <div class="flex items-center gap-3 p-3.5 rounded-xl border transition-colors"
               :class="themeMode === 'dark' ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200'"
             >
               <input 
                 id="pix-enabled-checkbox"
                 v-model="storePixEnabled" 
                 type="checkbox"
-                class="w-4.5 h-4.5 text-primary rounded border-slate-300 focus:ring-primary focus:ring-opacity-50 cursor-pointer"
+                class="w-5 h-5 text-primary rounded border-slate-300 focus:ring-primary focus:ring-opacity-50 cursor-pointer"
               />
-              <label for="pix-enabled-checkbox" class="text-xs font-bold select-none cursor-pointer flex-1"
-                :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
+              <label for="pix-enabled-checkbox" class="text-xs md:text-sm font-bold select-none cursor-pointer flex-1"
+                :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'"
               >
-                Habilitar QR Code Pix dinâmico com valor na tela de sucesso
+                Habilitar QR Code Pix dinâmico e Copia e Cola na tela de sucesso
               </label>
             </div>
 
             <!-- Dados do Pix (Aparecem desabilitados se Pix desativado) -->
-            <div class="space-y-4" :class="{ 'opacity-60 pointer-events-none': !storePixEnabled }">
-              <!-- Chave Pix -->
+            <div class="space-y-5" :class="{ 'opacity-60 pointer-events-none': !storePixEnabled }">
+              
+              <!-- Seletor de Tipo de Chave Pix -->
               <div class="space-y-2">
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
                   :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                >Chave Pix de Recebimento</label>
-                <Input 
-                  v-model="storePixKey" 
-                  placeholder="E-mail, Telefone, CPF, CNPJ ou Chave Aleatória" 
-                  class="rounded-xl w-full"
-                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
-                />
-                <p class="text-[10px] text-slate-500">
-                  Insira a chave cadastrada no seu banco exatamente como deve ser copiada.
-                </p>
+                >
+                  Tipo da Chave Pix
+                </label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                  <!-- Celular -->
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer"
+                    :class="storePixKeyType === 'celular'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : (themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70')"
+                    @click="selectPixKeyType('celular')"
+                  >
+                    <Phone class="w-3.5 h-3.5" />
+                    Celular
+                  </button>
+
+                  <!-- CPF -->
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer"
+                    :class="storePixKeyType === 'cpf'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : (themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70')"
+                    @click="selectPixKeyType('cpf')"
+                  >
+                    <Hash class="w-3.5 h-3.5" />
+                    CPF
+                  </button>
+
+                  <!-- CNPJ -->
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer"
+                    :class="storePixKeyType === 'cnpj'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : (themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70')"
+                    @click="selectPixKeyType('cnpj')"
+                  >
+                    <Building class="w-3.5 h-3.5" />
+                    CNPJ
+                  </button>
+
+                  <!-- E-mail -->
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer"
+                    :class="storePixKeyType === 'email'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : (themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70')"
+                    @click="selectPixKeyType('email')"
+                  >
+                    <Mail class="w-3.5 h-3.5" />
+                    E-mail
+                  </button>
+
+                  <!-- Aleatória (EVP) -->
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer col-span-2 sm:col-span-1"
+                    :class="storePixKeyType === 'aleatoria'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : (themeMode === 'dark' ? 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/70')"
+                    @click="selectPixKeyType('aleatoria')"
+                  >
+                    <Key class="w-3.5 h-3.5" />
+                    Aleatória (EVP)
+                  </button>
+                </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Input da Chave Pix -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                    :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                  >
+                    Chave Pix ({{ storePixKeyType.toUpperCase() }})
+                  </label>
+                  <span v-if="pixFormattedPreview && pixKeyValidation.valida" class="text-[11px] font-mono text-emerald-500 font-bold flex items-center gap-1">
+                    <Check class="w-3 h-3" /> Padrão Bacen: {{ pixFormattedPreview }}
+                  </span>
+                </div>
+                
+                <Input 
+                  v-model="storePixKey" 
+                  :placeholder="
+                    storePixKeyType === 'celular' ? 'Ex: (16) 99999-9999 ou 16999999999' :
+                    storePixKeyType === 'cpf' ? 'Ex: 123.456.789-01 ou 12345678901' :
+                    storePixKeyType === 'cnpj' ? 'Ex: 12.345.678/0001-90 ou 12345678000190' :
+                    storePixKeyType === 'email' ? 'Ex: suaempresa@email.com' :
+                    'Ex: 123e4567-e89b-12d3-a456-426614174000'
+                  " 
+                  class="rounded-xl w-full text-sm font-mono"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
+                />
+
+                <!-- Caixa Explicativa e Formatação Automática -->
+                <div class="p-3 rounded-xl border text-xs leading-relaxed space-y-1.5"
+                  :class="themeMode === 'dark' ? 'bg-slate-950/70 border-slate-800 text-slate-400' : 'bg-amber-500/5 border-amber-500/15 text-amber-900'"
+                >
+                  <div v-if="storePixKeyType === 'celular'" class="space-y-0.5">
+                    <span class="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <Phone class="w-3.5 h-3.5" /> Como colocar Celular:
+                    </span>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">
+                      O Banco Central exige o formato internacional <strong>+55 + DDD + Número</strong> (ex: <code class="px-1 py-0.5 bg-amber-100 dark:bg-amber-950/60 rounded font-mono text-amber-800 dark:text-amber-300">+5516999999999</code>). Você pode digitar apenas o DDD e o número que o sistema adicionará o <strong class="font-mono">+55</strong> automaticamente!
+                    </p>
+                  </div>
+
+                  <div v-else-if="storePixKeyType === 'cpf'" class="space-y-0.5">
+                    <span class="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <Hash class="w-3.5 h-3.5" /> Como colocar CPF:
+                    </span>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">
+                      O Banco Central exige <strong>apenas os 11 números</strong>, sem pontos ou traços (ex: <code class="px-1 py-0.5 bg-amber-100 dark:bg-amber-950/60 rounded font-mono text-amber-800 dark:text-amber-300">12345678901</code>). Você pode colar com pontuação que o sistema removerá os pontos e traço automaticamente!
+                    </p>
+                  </div>
+
+                  <div v-else-if="storePixKeyType === 'cnpj'" class="space-y-0.5">
+                    <span class="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <Building class="w-3.5 h-3.5" /> Como colocar CNPJ:
+                    </span>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">
+                      O Banco Central exige <strong>apenas os 14 números</strong> (ex: <code class="px-1 py-0.5 bg-amber-100 dark:bg-amber-950/60 rounded font-mono text-amber-800 dark:text-amber-300">12345678000190</code>). Pontos, barras e traço serão removidos automaticamente.
+                    </p>
+                  </div>
+
+                  <div v-else-if="storePixKeyType === 'email'" class="space-y-0.5">
+                    <span class="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <Mail class="w-3.5 h-3.5" /> Como colocar E-mail:
+                    </span>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">
+                      O endereço de e-mail cadastrado como chave Pix na sua conta bancária (ex: <code class="px-1 py-0.5 bg-amber-100 dark:bg-amber-950/60 rounded font-mono text-amber-800 dark:text-amber-300">financeiro@sualoja.com</code>).
+                    </p>
+                  </div>
+
+                  <div v-else class="space-y-0.5">
+                    <span class="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <Key class="w-3.5 h-3.5" /> Como colocar Chave Aleatória (EVP):
+                    </span>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-400">
+                      Copie o código UUID de 32 caracteres com 4 traços gerado dentro do aplicativo do seu banco.
+                    </p>
+                  </div>
+
+                  <!-- Alerta se chave estiver inválida enquanto digita -->
+                  <div v-if="storePixKey.trim() && !pixKeyValidation.valida" class="pt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ pixKeyValidation.erro }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nome e Cidade -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <!-- Nome do Beneficiário -->
                 <div class="space-y-2">
                   <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
                     :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                  >Nome do Beneficiário</label>
+                  >Nome do Beneficiário (Conta)</label>
                   <Input 
                     v-model="storePixName" 
-                    placeholder="Ex: Joao Silva ou Nome da Loja" 
+                    placeholder="Ex: João Silva ou Nome da Loja" 
                     class="rounded-xl w-full"
                     :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
                   />
-                  <p class="text-[10px] text-slate-500">Nome cadastrado na conta bancária (máx. 25 letras, sem acentos no QR Code).</p>
+                  <p class="text-[10px] text-slate-500">
+                    Nome titular da conta (máx. 25 letras. Acentos são convertidos automaticamente no QR Code).
+                  </p>
                 </div>
 
                 <!-- Cidade do Beneficiário -->
                 <div class="space-y-2">
                   <label class="text-xs font-bold uppercase tracking-wider text-slate-400"
                     :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
-                  >Cidade do Beneficiário</label>
+                  >Cidade da Conta</label>
                   <Input 
                     v-model="storePixCity" 
                     placeholder="Ex: Cajuru" 
                     class="rounded-xl w-full"
                     :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white focus:ring-primary' : 'bg-slate-100 border-slate-300 text-slate-900 focus:ring-primary'"
                   />
-                  <p class="text-[10px] text-slate-500">Cidade cadastrada na conta (máx. 15 letras, sem acentos no QR Code).</p>
+                  <p class="text-[10px] text-slate-500">
+                    Cidade da agência bancária (máx. 15 letras, sem acentos).
+                  </p>
                 </div>
               </div>
             </div>
@@ -1780,7 +2521,7 @@ const formatPrice = (val: number) => {
 
             <div v-if="savePixSuccess" class="p-3 rounded-xl bg-emerald-955/30 border border-emerald-500/30 text-emerald-450 text-xs flex items-center gap-2">
               <Check class="w-4 h-4 shrink-0" />
-              <span>Configurações do Pix salvas com sucesso no banco de dados Turso!</span>
+              <span>Configurações do Pix salvas e formatadas no padrão do Banco Central com sucesso!</span>
             </div>
 
             <!-- Ações -->
@@ -1789,7 +2530,7 @@ const formatPrice = (val: number) => {
             >
               <Button 
                 size="sm"
-                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                class="rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 cursor-pointer"
                 :disabled="isSavingPix"
                 @click="handleSavePix"
               >
@@ -1914,5 +2655,26 @@ const formatPrice = (val: number) => {
       </TabsContent>
     </Tabs>
     </div>
+
+    <!-- Modais de Alteração e Redefinição de Senha -->
+    <ChangePasswordModal 
+      :open="showChangePasswordModal" 
+      @update:open="showChangePasswordModal = $event" 
+    />
+
+    <ChangePasswordModal 
+      :open="showResetUserPasswordModal" 
+      :target-user="selectedUserForPasswordReset"
+      @update:open="showResetUserPasswordModal = $event" 
+    />
+
+    <!-- Modal de Recorte para Logo da Loja -->
+    <ImageCropperModal
+      v-model:open="showLogoCropperModal"
+      :image-src="logoCropperRawImage"
+      initial-aspect-ratio="1:1"
+      title="Ajustar Logo do Estabelecimento"
+      @crop="handleLogoCropComplete"
+    />
   </div>
 </template>

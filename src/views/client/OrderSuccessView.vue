@@ -18,7 +18,7 @@ import {
   Clock
 } from 'lucide-vue-next'
 import { fetchOrders, fetchSetting, currentCompany, currentCompanySlug, type Order } from '@/services/store'
-import { gerarPayloadPix } from '@/services/pix'
+import { gerarPayloadPix, gerarQrCodePixDataUrl } from '@/services/pix'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
@@ -36,6 +36,7 @@ const pixKey = ref('')
 const pixName = ref('')
 const pixCity = ref('Cajuru')
 const isCopied = ref(false)
+const pixQrCodeDataUrl = ref('')
 
 // Refs para o cronômetro do Pix
 const countdownText = ref('10:00')
@@ -132,6 +133,7 @@ const handleSendToWhatsapp = () => {
 }
 
 // Helper para obter payload Pix Copia e Cola
+// No Pix estático, o txid '***' garante que todos os bancos (Nubank, Itaú, BB, etc.) aceitem o pagamento
 const getPixPayloadString = () => {
   if (!order.value || !pixKey.value) return ''
   return gerarPayloadPix(
@@ -139,15 +141,28 @@ const getPixPayloadString = () => {
     pixName.value || 'LOJA THORDER',
     pixCity.value || 'CAJURU',
     order.value.total_cost,
-    `TH${order.value.id}`
+    '***'
   )
 }
 
-// Helper para obter imagem do QR Code
+// Helper para obter imagem do QR Code (prioriza geração local offline em alta definição)
 const getPixQrCodeUrl = () => {
+  if (pixQrCodeDataUrl.value) return pixQrCodeDataUrl.value
   const payload = getPixPayloadString()
   if (!payload) return ''
-  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(payload)}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(payload)}`
+}
+
+// Gera o QR Code localmente via canvas/base64
+const atualizarQrCodeLocal = async () => {
+  const payload = getPixPayloadString()
+  if (payload) {
+    try {
+      pixQrCodeDataUrl.value = await gerarQrCodePixDataUrl(payload)
+    } catch (e) {
+      console.warn('Usando fallback do QR Code:', e)
+    }
+  }
 }
 
 // Copiar código do Pix
@@ -220,6 +235,9 @@ onMounted(async () => {
     if (found) {
       order.value = found
       startCountdown()
+      if (pixEnabled.value && pixKey.value) {
+        await atualizarQrCodeLocal()
+      }
       // Auto redirecionamento após 1.5s se a forma de pagamento NÃO for Pix, ou se o Pix não estiver ativo na loja
       if (order.value.payment_method !== 'pix' || !pixEnabled.value) {
         setTimeout(() => {

@@ -98,6 +98,28 @@ export interface ShippingOption {
   carrier: string;
   price: number;
   deliveryDays: number;
+  distanceKm?: number;
+  isBeyondMaxRadius?: boolean;
+  freeShippingApplied?: boolean;
+}
+
+// Interface para Faixas de Raio / Distância de Entrega
+export interface DeliveryTier {
+  maxKm: number;
+  price: number;
+}
+
+// Interface para Configurações Completas de Entrega da Loja
+export interface DeliverySettings {
+  storeCep: string;
+  storeAddress: string;
+  storeLat: number | null;
+  storeLng: number | null;
+  storeWhatsapp: string;
+  maxRadiusKm: number;
+  tiers: DeliveryTier[];
+  freeShippingMin: number;
+  pickupEnabled: boolean;
 }
 
 // Interface para Cupom
@@ -1464,6 +1486,159 @@ export async function deleteUser(userId: number): Promise<void> {
   localStorage.setItem('thorder_local_users', JSON.stringify(users));
 }
 
+export async function changeUserPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await ensureDbInitialized();
+  if (!currentUser.value || !currentUser.value.id) {
+    throw new Error("Você precisa estar autenticado para alterar a senha.");
+  }
+  if (!currentPassword) {
+    throw new Error("Informe sua senha atual.");
+  }
+  if (!newPassword || newPassword.length < 4) {
+    throw new Error("A nova senha deve conter pelo menos 4 caracteres.");
+  }
+  if (currentPassword === newPassword) {
+    throw new Error("A nova senha não pode ser idêntica à senha atual.");
+  }
+
+  const currentHash = await sha256(currentPassword);
+  const newHash = await sha256(newPassword);
+  const userId: number = currentUser.value.id;
+  const client = getDbClient();
+
+  if (client) {
+    try {
+      const res = await client.execute({
+        sql: "SELECT password_hash FROM users WHERE id = ?",
+        args: [userId]
+      });
+      if (res.rows.length === 0) {
+        throw new Error("Usuário não encontrado.");
+      }
+      const existingHash = String(res.rows[0]?.password_hash || '');
+      if (existingHash !== currentHash) {
+        throw new Error("A senha atual informada está incorreta.");
+      }
+
+      await client.execute({
+        sql: "UPDATE users SET password_hash = ? WHERE id = ?",
+        args: [newHash, userId]
+      });
+
+      // Também sincroniza o fallback se existir no localStorage
+      try {
+        const stored = localStorage.getItem('thorder_local_users');
+        if (stored) {
+          const users: any[] = JSON.parse(stored);
+          const idx = users.findIndex(u => u.id === userId);
+          if (idx !== -1) {
+            users[idx].password_hash = newHash;
+            localStorage.setItem('thorder_local_users', JSON.stringify(users));
+          }
+        }
+      } catch {}
+
+      return;
+    } catch (e: any) {
+      if (e.message && (e.message.includes("incorreta") || e.message.includes("não encontrado"))) {
+        throw e;
+      }
+      console.error("Erro ao alterar senha no Turso, tentando fallback local:", e);
+    }
+  }
+
+  // Fallback Local Storage
+  initLocalUsers();
+  const stored = localStorage.getItem('thorder_local_users') || '[]';
+  let users: any[] = JSON.parse(stored);
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) {
+    throw new Error("Usuário não encontrado.");
+  }
+  if (users[idx].password_hash !== currentHash) {
+    throw new Error("A senha atual informada está incorreta.");
+  }
+  users[idx].password_hash = newHash;
+  localStorage.setItem('thorder_local_users', JSON.stringify(users));
+}
+
+export async function resetUserPassword(userId: number, newPassword: string): Promise<void> {
+  await ensureDbInitialized();
+  if (!currentUser.value) {
+    throw new Error("Acesso não autorizado.");
+  }
+  if (!newPassword || newPassword.length < 4) {
+    throw new Error("A nova senha deve conter pelo menos 4 caracteres.");
+  }
+
+  const newHash = await sha256(newPassword);
+  const client = getDbClient();
+
+  if (client) {
+    try {
+      const res = await client.execute({
+        sql: "SELECT id, role, company_slug FROM users WHERE id = ?",
+        args: [userId]
+      });
+      if (res.rows.length === 0) {
+        throw new Error("Usuário não encontrado.");
+      }
+      const targetUser = res.rows[0];
+
+      // Verificação de permissão: Lojista só pode redefinir senhas da sua própria loja
+      if (currentUser.value.role !== 'superadmin') {
+        if (!currentUser.value.company_slug || targetUser.company_slug !== currentUser.value.company_slug) {
+          throw new Error("Você não tem permissão para alterar a senha deste usuário.");
+        }
+      }
+
+      await client.execute({
+        sql: "UPDATE users SET password_hash = ? WHERE id = ?",
+        args: [newHash, userId]
+      });
+
+      // Também sincroniza fallback se existir
+      try {
+        const stored = localStorage.getItem('thorder_local_users');
+        if (stored) {
+          const users: any[] = JSON.parse(stored);
+          const idx = users.findIndex(u => u.id === userId);
+          if (idx !== -1) {
+            users[idx].password_hash = newHash;
+            localStorage.setItem('thorder_local_users', JSON.stringify(users));
+          }
+        }
+      } catch {}
+
+      return;
+    } catch (e: any) {
+      if (e.message && (e.message.includes("permissão") || e.message.includes("não encontrado"))) {
+        throw e;
+      }
+      console.error("Erro ao redefinir senha no Turso, tentando fallback local:", e);
+    }
+  }
+
+  // Fallback Local Storage
+  initLocalUsers();
+  const stored = localStorage.getItem('thorder_local_users') || '[]';
+  let users: any[] = JSON.parse(stored);
+  const idx = users.findIndex(u => u.id === userId);
+  if (idx === -1) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  if (currentUser.value.role !== 'superadmin') {
+    if (!currentUser.value.company_slug || users[idx].company_slug !== currentUser.value.company_slug) {
+      throw new Error("Você não tem permissão para alterar a senha deste usuário.");
+    }
+  }
+
+  users[idx].password_hash = newHash;
+  localStorage.setItem('thorder_local_users', JSON.stringify(users));
+}
+
+
 export async function registerStoreAndAdmin(params: {
   companyName: string;
   companySlug: string;
@@ -2094,50 +2269,292 @@ export async function saveSetting(key: string, value: string): Promise<void> {
 }
 
 // ==========================================
-// CÁLCULO DE FRETE E HORÁRIO DE FUNCIONAMENTO
+// CÁLCULO DE FRETE POR RAIO / DISTÂNCIA E HORÁRIO DE FUNCIONAMENTO
 // ==========================================
 
-export function isLocalRegion(cleanCep: string): boolean {
-  const cepNum = parseInt(cleanCep, 10);
-  const localRanges = [
-    { min: 14240000, max: 14240999 }, // Cajuru - SP
-    { min: 14230000, max: 14239999 }  // Região próxima (ex: Cássia dos Coqueiros)
-  ];
-  return localRanges.some(range => cepNum >= range.min && cepNum <= range.max);
+export const DEFAULT_DELIVERY_TIERS: DeliveryTier[] = [
+  { maxKm: 3, price: 5.00 },
+  { maxKm: 6, price: 8.00 },
+  { maxKm: 10, price: 12.00 },
+  { maxKm: 15, price: 18.00 }
+];
+
+const geocodeCache = new Map<string, { lat: number; lng: number; address?: string; city?: string; state?: string }>();
+
+// Geocodificação automática de CEP brasileiro usando APIs abertas sem necessidade de chave
+export async function geocodeCep(cep: string): Promise<{ lat: number; lng: number; address?: string; city?: string; state?: string } | null> {
+  const clean = cep.replace(/\D/g, "");
+  if (clean.length !== 8) return null;
+
+  if (geocodeCache.has(clean)) {
+    return geocodeCache.get(clean)!;
+  }
+
+  // 1. Tenta BrasilAPI v2 (rápida, retorna coordenadas)
+  try {
+    const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${clean}`, {
+      headers: { "Accept": "application/json" }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.location?.coordinates?.latitude && data.location?.coordinates?.longitude) {
+        const lat = parseFloat(data.location.coordinates.latitude);
+        const lng = parseFloat(data.location.coordinates.longitude);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const result = {
+            lat,
+            lng,
+            address: data.street ? `${data.street}${data.neighborhood ? ' - ' + data.neighborhood : ''}`.trim() : undefined,
+            city: data.city,
+            state: data.state
+          };
+          geocodeCache.set(clean, result);
+          return result;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 2. Tenta AwesomeAPI CEP (retorna lat e lng diretamente)
+  try {
+    const res = await fetch(`https://cep.awesomeapi.com.br/json/${clean}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.lat && data.lng) {
+        const lat = parseFloat(data.lat);
+        const lng = parseFloat(data.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const result = {
+            lat,
+            lng,
+            address: data.address ? `${data.address}${data.district ? ' - ' + data.district : ''}`.trim() : undefined,
+            city: data.city,
+            state: data.state
+          };
+          geocodeCache.set(clean, result);
+          return result;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 3. Fallback: ViaCEP para obter dados textuais e OpenStreetMap Nominatim para geocodificação
+  try {
+    const viaRes = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+    if (viaRes.ok) {
+      const viaData = await viaRes.json();
+      if (!viaData.erro) {
+        const query = encodeURIComponent(`${viaData.logradouro ? viaData.logradouro + ', ' : ''}${viaData.localidade}, ${viaData.uf}, Brasil`);
+        const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+          headers: { "User-Agent": "ThorderApp/1.0" }
+        });
+        if (nomRes.ok) {
+          const nomData = await nomRes.json();
+          if (nomData && nomData.length > 0) {
+            const lat = parseFloat(nomData[0].lat);
+            const lng = parseFloat(nomData[0].lon);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              const result = {
+                lat,
+                lng,
+                address: viaData.logradouro ? `${viaData.logradouro}, ${viaData.bairro || ''}` : undefined,
+                city: viaData.localidade,
+                state: viaData.uf
+              };
+              geocodeCache.set(clean, result);
+              return result;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  return null;
 }
 
-export async function calculateShipping(cep: string): Promise<ShippingOption[]> {
+// Geocodificação de endereço em texto completo (para lojas que especificam rua e número)
+export async function geocodeAddress(addressText: string): Promise<{ lat: number; lng: number } | null> {
+  if (!addressText.trim()) return null;
+  try {
+    const query = encodeURIComponent(`${addressText.trim()}, Brasil`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+      headers: { "User-Agent": "ThorderApp/1.0" }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+// Fórmula de Haversine para cálculo de distância precisa em linha reta (em km)
+export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  return Math.round(distance * 10) / 10; // 1 casa decimal (ex: 4.2 km)
+}
+
+// Busca as configurações de entrega da loja ativa
+export async function fetchDeliverySettings(): Promise<DeliverySettings> {
+  const storeCep = await fetchSetting("store_cep", "14240-000");
+  const storeAddress = await fetchSetting("store_address", "Rua Marechal Deodoro, 150 - Centro, Cajuru - SP");
+  const storeLatStr = await fetchSetting("store_lat", "-21.2755425");
+  const storeLngStr = await fetchSetting("store_lng", "-47.3013532");
+  const storeWhatsapp = await fetchSetting("store_whatsapp", "5516999999999");
+  const maxRadiusStr = await fetchSetting("delivery_max_radius_km", "15");
+  const tiersJson = await fetchSetting("delivery_tiers", JSON.stringify(DEFAULT_DELIVERY_TIERS));
+  const freeShippingMinStr = await fetchSetting("delivery_free_shipping_min", "0");
+  const pickupEnabledStr = await fetchSetting("delivery_pickup_enabled", "true");
+
+  let tiers: DeliveryTier[] = DEFAULT_DELIVERY_TIERS;
+  try {
+    const parsed = JSON.parse(tiersJson);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      tiers = parsed;
+    }
+  } catch {
+    tiers = DEFAULT_DELIVERY_TIERS;
+  }
+
+  return {
+    storeCep,
+    storeAddress,
+    storeLat: storeLatStr && !isNaN(parseFloat(storeLatStr)) ? parseFloat(storeLatStr) : null,
+    storeLng: storeLngStr && !isNaN(parseFloat(storeLngStr)) ? parseFloat(storeLngStr) : null,
+    storeWhatsapp,
+    maxRadiusKm: parseFloat(maxRadiusStr) || 15,
+    tiers: tiers.sort((a, b) => a.maxKm - b.maxKm),
+    freeShippingMin: parseFloat(freeShippingMinStr) || 0,
+    pickupEnabled: pickupEnabledStr !== "false"
+  };
+}
+
+// Salva as configurações de entrega da loja ativa
+export async function saveDeliverySettings(settings: DeliverySettings): Promise<void> {
+  await Promise.all([
+    saveSetting("store_cep", settings.storeCep.trim()),
+    saveSetting("store_address", settings.storeAddress.trim()),
+    saveSetting("store_lat", settings.storeLat !== null ? String(settings.storeLat) : ""),
+    saveSetting("store_lng", settings.storeLng !== null ? String(settings.storeLng) : ""),
+    saveSetting("store_whatsapp", settings.storeWhatsapp.trim()),
+    saveSetting("delivery_max_radius_km", String(settings.maxRadiusKm)),
+    saveSetting("delivery_tiers", JSON.stringify(settings.tiers.sort((a, b) => a.maxKm - b.maxKm))),
+    saveSetting("delivery_free_shipping_min", String(settings.freeShippingMin)),
+    saveSetting("delivery_pickup_enabled", settings.pickupEnabled ? "true" : "false")
+  ]);
+}
+
+// Calcula o frete de forma dinâmica baseado na distância em km (sem restrição fixa de cidade)
+export async function calculateShipping(cep: string, cartTotal: number = 0): Promise<ShippingOption[]> {
   const cleanCep = cep.replace(/\D/g, "");
   if (cleanCep.length !== 8) {
     throw new Error("CEP inválido. Digite um CEP com 8 dígitos.");
   }
-  
-  const isLocal = isLocalRegion(cleanCep);
-  const storeAddress = await fetchSetting("store_address", "Rua Marechal Deodoro, 150 - Centro, Cajuru - SP");
-  
-  if (isLocal) {
-    return [
-      {
-        carrier: "Entrega Local (Cajuru e Região)",
-        price: 3.00,
-        deliveryDays: 1
-      },
-      {
-        carrier: `Retirada na Loja (${storeAddress})`,
-        price: 0.00,
-        deliveryDays: 0
-      }
-    ];
-  } else {
-    return [
-      {
-        carrier: `Retirada na Loja (${storeAddress})`,
-        price: 0.00,
-        deliveryDays: 0
-      }
-    ];
+
+  const deliverySettings = await fetchDeliverySettings();
+  let storeLat = deliverySettings.storeLat;
+  let storeLng = deliverySettings.storeLng;
+
+  // Se a loja não tiver coordenadas gravadas, tenta geocodificar seu endereço/CEP
+  if (!storeLat || !storeLng) {
+    const storeGeo = await geocodeCep(deliverySettings.storeCep || "14240000");
+    if (storeGeo) {
+      storeLat = storeGeo.lat;
+      storeLng = storeGeo.lng;
+      saveSetting("store_lat", String(storeLat));
+      saveSetting("store_lng", String(storeLng));
+    }
   }
+
+  // Geocodifica o CEP do cliente
+  const customerGeo = await geocodeCep(cleanCep);
+
+  const options: ShippingOption[] = [];
+
+  if (storeLat && storeLng && customerGeo) {
+    const distanceKm = calculateDistanceKm(storeLat, storeLng, customerGeo.lat, customerGeo.lng);
+    const isWithinRadius = distanceKm <= deliverySettings.maxRadiusKm;
+
+    if (isWithinRadius) {
+      // Identifica a faixa de preço adequada
+      const sortedTiers = [...deliverySettings.tiers].sort((a, b) => a.maxKm - b.maxKm);
+      let matchedTier = sortedTiers.find(t => distanceKm <= t.maxKm);
+      if (!matchedTier && sortedTiers.length > 0) {
+        matchedTier = sortedTiers[sortedTiers.length - 1];
+      }
+
+      let price = matchedTier ? matchedTier.price : 5.00;
+      let freeShippingApplied = false;
+
+      // Validação de Frete Grátis por valor mínimo de pedido
+      if (deliverySettings.freeShippingMin > 0 && cartTotal >= deliverySettings.freeShippingMin) {
+        price = 0.00;
+        freeShippingApplied = true;
+      }
+
+      options.push({
+        carrier: freeShippingApplied 
+          ? `Entrega Local (${distanceKm} km) - Frete Grátis!` 
+          : `Entrega Local (${distanceKm} km da loja)`,
+        price,
+        deliveryDays: 1,
+        distanceKm,
+        freeShippingApplied
+      });
+    } else {
+      // Endereço além do raio máximo permitido
+      if (deliverySettings.pickupEnabled) {
+        options.push({
+          carrier: `Retirada na Loja (${deliverySettings.storeAddress})`,
+          price: 0.00,
+          deliveryDays: 0,
+          distanceKm,
+          isBeyondMaxRadius: true
+        });
+        return options;
+      } else {
+        throw new Error(`Seu endereço está a ${distanceKm} km da loja, além do nosso raio máximo de entrega de ${deliverySettings.maxRadiusKm} km.`);
+      }
+    }
+  } else {
+    // Fallback caso a API de geocodificação do CEP esteja temporariamente indisponível
+    const defaultPrice = deliverySettings.tiers[0]?.price ?? 5.00;
+    const isFree = deliverySettings.freeShippingMin > 0 && cartTotal >= deliverySettings.freeShippingMin;
+    options.push({
+      carrier: isFree ? "Entrega Local - Frete Grátis!" : "Entrega Local (Estimada)",
+      price: isFree ? 0 : defaultPrice,
+      deliveryDays: 1,
+      freeShippingApplied: isFree
+    });
+  }
+
+  // Opção de Retirada na Loja
+  if (deliverySettings.pickupEnabled && !options.some(o => o.carrier.toLowerCase().includes("retirada"))) {
+    options.push({
+      carrier: `Retirada na Loja (${deliverySettings.storeAddress})`,
+      price: 0.00,
+      deliveryDays: 0
+    });
+  }
+
+  return options;
 }
+
 
 export async function checkStoreOpen(): Promise<{ isOpen: boolean; openTime: string; closeTime: string; isEnabled: boolean }> {
   const isEnabledStr = await fetchSetting('store_hours_enabled', 'false');

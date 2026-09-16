@@ -284,6 +284,8 @@ export function clearCurrentCompanySlug() {
   currentCompanySlug.value = '';
   currentCompany.value = null;
   setThemeColor('purple'); // Tema neutro da Landing Page
+  currentStoreCustomization.value = { ...DEFAULT_STORE_CUSTOMIZATION };
+  applyStoreCustomization(DEFAULT_STORE_CUSTOMIZATION);
 }
 
 export async function setCurrentCompanySlug(slug: string) {
@@ -302,6 +304,13 @@ export async function setCurrentCompanySlug(slug: string) {
     setThemeColor("gold");
   }
   
+  // Carrega e aplica customizações visuais da loja ativa
+  try {
+    await fetchStoreCustomization();
+  } catch (e) {
+    console.error("Erro ao sincronizar customização da loja:", e);
+  }
+
   // Recarrega o contador do carrinho com base no carrinho da nova empresa ativa
   cartCount.value = getCart().reduce((sum, item) => sum + item.quantity, 0);
 }
@@ -458,6 +467,155 @@ export function setThemeColor(color: string) {
 // Executa o tema na primeira importação
 if (typeof document !== 'undefined') {
   applyTheme();
+}
+
+// ==========================================
+// CUSTOMIZAÇÃO DA IDENTIDADE VISUAL DA LOJA
+// ==========================================
+
+export interface StoreFontOption {
+  id: string;
+  name: string;
+  category: string;
+  badge: string;
+  googleFont: string;
+}
+
+export const AVAILABLE_FONTS: StoreFontOption[] = [
+  { id: 'Inter', name: 'Inter', category: 'Clean & Universal', badge: 'Moderna / Clean', googleFont: 'Inter:wght@400;500;600;700;800' },
+  { id: 'Plus Jakarta Sans', name: 'Plus Jakarta Sans', category: 'Elegante & Sofisticada', badge: 'Elegante / Tech', googleFont: 'Plus+Jakarta+Sans:wght@400;500;600;700;800' },
+  { id: 'Poppins', name: 'Poppins', category: 'Geométrica & Amigável', badge: 'Jovem / Delivery', googleFont: 'Poppins:wght@400;500;600;700;800' },
+  { id: 'Outfit', name: 'Outfit', category: 'Arredondada & Premium', badge: 'Arredondada / Premium', googleFont: 'Outfit:wght@400;500;600;700;800' },
+  { id: 'Montserrat', name: 'Montserrat', category: 'Urbana & Marcante', badge: 'Urbana / Moda', googleFont: 'Montserrat:wght@400;500;600;700;800' },
+  { id: 'Playfair Display', name: 'Playfair Display', category: 'Serifada Luxuosa', badge: 'Luxo / Serifada', googleFont: 'Playfair+Display:wght@400;600;700;800' },
+  { id: 'Cormorant Garamond', name: 'Cormorant Garamond', category: 'Nobre & Clássica', badge: 'Gourmet / Fina', googleFont: 'Cormorant+Garamond:wght@400;600;700' },
+  { id: 'Cinzel', name: 'Cinzel', category: 'Clássica Romana & Prestígio', badge: 'Clássica / Nobre', googleFont: 'Cinzel:wght@400;600;700;800' },
+  { id: 'Oswald', name: 'Oswald', category: 'Condensada & Forte', badge: 'Hamburgueria / Forte', googleFont: 'Oswald:wght@400;500;600;700' },
+  { id: 'Syne', name: 'Syne', category: 'Arrojada & Avant-garde', badge: 'Design / Criativa', googleFont: 'Syne:wght@500;700;800' },
+  { id: 'Bebas Neue', name: 'Bebas Neue', category: 'Display & Chamativa', badge: 'Display / Impacto', googleFont: 'Bebas+Neue' },
+  { id: 'Geist', name: 'Geist Sans', category: 'Minimalista & Precisa', badge: 'Minimalista', googleFont: 'Geist:wght@400;500;600;700' }
+];
+
+export interface StoreCustomization {
+  fontFamily: string;
+  bannerImagePosition: 'right' | 'left' | 'center' | 'hidden';
+  bannerAlignment: 'left' | 'center' | 'right';
+  logoShape: 'circle' | 'squircle' | 'square' | 'none';
+  logoSize: 'sm' | 'md' | 'lg';
+  bannerStyle: 'gradient' | 'minimal' | 'glass' | 'cover';
+  bannerCoverImage?: string;
+  bannerBadgeText: string;
+  bannerShowBadge: boolean;
+  cardRadius: 'rounded' | 'pill' | 'sharp';
+}
+
+export const DEFAULT_STORE_CUSTOMIZATION: StoreCustomization = {
+  fontFamily: 'Inter',
+  bannerImagePosition: 'right',
+  bannerAlignment: 'left',
+  logoShape: 'circle',
+  logoSize: 'md',
+  bannerStyle: 'gradient',
+  bannerCoverImage: '',
+  bannerBadgeText: '',
+  bannerShowBadge: true,
+  cardRadius: 'rounded'
+};
+
+export const currentStoreCustomization = ref<StoreCustomization>({ ...DEFAULT_STORE_CUSTOMIZATION });
+
+export function applyStoreCustomization(customization?: StoreCustomization) {
+  if (typeof document === 'undefined') return;
+  const config = customization || currentStoreCustomization.value;
+  if (!config) return;
+
+  const fontId = config.fontFamily || 'Inter';
+  const fontObj = AVAILABLE_FONTS.find(f => f.id === fontId) || AVAILABLE_FONTS[0];
+
+  if (fontObj && fontObj.googleFont) {
+    const linkId = 'thorder-dynamic-google-font';
+    let linkEl = document.getElementById(linkId) as HTMLLinkElement | null;
+    const fontHref = `https://fonts.googleapis.com/css2?family=${fontObj.googleFont}&display=swap`;
+    if (!linkEl) {
+      linkEl = document.createElement('link');
+      linkEl.id = linkId;
+      linkEl.rel = 'stylesheet';
+      document.head.appendChild(linkEl);
+    } else if (linkEl.href !== fontHref) {
+      linkEl.href = fontHref;
+    }
+  }
+
+  const root = document.documentElement;
+  const fontCss = `"${fontId}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  root.style.setProperty('--store-font', fontCss);
+  root.style.fontFamily = fontCss;
+}
+
+export async function fetchStoreCustomization(): Promise<StoreCustomization> {
+  const [
+    fontFamily,
+    bannerImagePosition,
+    bannerAlignment,
+    logoShape,
+    logoSize,
+    bannerStyle,
+    bannerCoverImage,
+    bannerBadgeText,
+    bannerShowBadge,
+    cardRadius
+  ] = await Promise.all([
+    fetchSetting("store_font_family", DEFAULT_STORE_CUSTOMIZATION.fontFamily),
+    fetchSetting("store_banner_image_pos", DEFAULT_STORE_CUSTOMIZATION.bannerImagePosition),
+    fetchSetting("store_banner_align", DEFAULT_STORE_CUSTOMIZATION.bannerAlignment),
+    fetchSetting("store_logo_shape", DEFAULT_STORE_CUSTOMIZATION.logoShape),
+    fetchSetting("store_logo_size", DEFAULT_STORE_CUSTOMIZATION.logoSize),
+    fetchSetting("store_banner_style", DEFAULT_STORE_CUSTOMIZATION.bannerStyle),
+    fetchSetting("store_banner_cover", ""),
+    fetchSetting("store_banner_badge", ""),
+    fetchSetting("store_banner_show_badge", "true"),
+    fetchSetting("store_card_radius", DEFAULT_STORE_CUSTOMIZATION.cardRadius)
+  ]);
+
+  const customization: StoreCustomization = {
+    fontFamily: fontFamily || DEFAULT_STORE_CUSTOMIZATION.fontFamily,
+    bannerImagePosition: (['right', 'left', 'center', 'hidden'].includes(bannerImagePosition) ? bannerImagePosition : 'right') as StoreCustomization['bannerImagePosition'],
+    bannerAlignment: (['left', 'center', 'right'].includes(bannerAlignment) ? bannerAlignment : 'left') as StoreCustomization['bannerAlignment'],
+    logoShape: (['circle', 'squircle', 'square', 'none'].includes(logoShape) ? logoShape : 'circle') as StoreCustomization['logoShape'],
+    logoSize: (['sm', 'md', 'lg'].includes(logoSize) ? logoSize : 'md') as StoreCustomization['logoSize'],
+    bannerStyle: (['gradient', 'minimal', 'glass', 'cover'].includes(bannerStyle) ? bannerStyle : 'gradient') as StoreCustomization['bannerStyle'],
+    bannerCoverImage: bannerCoverImage || '',
+    bannerBadgeText: bannerBadgeText || '',
+    bannerShowBadge: bannerShowBadge !== 'false',
+    cardRadius: (['rounded', 'pill', 'sharp'].includes(cardRadius) ? cardRadius : 'rounded') as StoreCustomization['cardRadius']
+  };
+
+  currentStoreCustomization.value = customization;
+  applyStoreCustomization(customization);
+  return customization;
+}
+
+export async function saveStoreCustomization(customization: StoreCustomization): Promise<void> {
+  await Promise.all([
+    saveSetting("store_font_family", customization.fontFamily),
+    saveSetting("store_banner_image_pos", customization.bannerImagePosition),
+    saveSetting("store_banner_align", customization.bannerAlignment),
+    saveSetting("store_logo_shape", customization.logoShape),
+    saveSetting("store_logo_size", customization.logoSize),
+    saveSetting("store_banner_style", customization.bannerStyle),
+    saveSetting("store_banner_cover", customization.bannerCoverImage || ""),
+    saveSetting("store_banner_badge", customization.bannerBadgeText || ""),
+    saveSetting("store_banner_show_badge", customization.bannerShowBadge ? "true" : "false"),
+    saveSetting("store_card_radius", customization.cardRadius)
+  ]);
+
+  currentStoreCustomization.value = { ...customization };
+  applyStoreCustomization(customization);
+}
+
+// Executa a customização inicial no cliente
+if (typeof document !== 'undefined') {
+  applyStoreCustomization();
 }
 
 // ==========================================

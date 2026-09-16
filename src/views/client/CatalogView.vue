@@ -22,6 +22,8 @@ import {
   themeMode,
   themeColor,
   currentCompany,
+  currentStoreCustomization,
+  fetchStoreCustomization,
   type Product,
   type CartItem
 } from '@/services/store'
@@ -53,17 +55,71 @@ const router = useRouter()
 const showCartDialog = ref(false)
 const cartItems = ref<CartItem[]>([])
 
+// Helpers visuais da Identidade da Loja
+const logoShapeClass = computed(() => {
+  switch (currentStoreCustomization.value.logoShape) {
+    case 'squircle': return 'rounded-3xl'
+    case 'square': return 'rounded-xl'
+    case 'none': return 'rounded-none'
+    case 'circle':
+    default: return 'rounded-full'
+  }
+})
+
+const logoSizeClass = computed(() => {
+  switch (currentStoreCustomization.value.logoSize) {
+    case 'sm': return 'w-28 h-28 md:w-32 md:h-32 text-3xl'
+    case 'lg': return 'w-44 h-44 md:w-56 md:h-56 text-6xl'
+    case 'md':
+    default: return 'w-36 h-36 md:w-44 md:h-44 text-5xl'
+  }
+})
+
+const bannerStyleClass = computed(() => {
+  const style = currentStoreCustomization.value.bannerStyle
+  if (style === 'minimal') {
+    return themeMode.value === 'dark' 
+      ? 'border-slate-800 bg-slate-900/60 shadow-md' 
+      : 'border-slate-200 bg-slate-50/90 shadow-sm'
+  }
+  if (style === 'glass') {
+    return themeMode.value === 'dark' 
+      ? 'border-slate-800/80 bg-slate-950/40 backdrop-blur-xl shadow-2xl' 
+      : 'border-slate-200/80 bg-white/70 backdrop-blur-xl shadow-xl'
+  }
+  if (style === 'cover' && currentStoreCustomization.value.bannerCoverImage) {
+    return 'border-slate-800 shadow-2xl relative bg-cover bg-center'
+  }
+  // Default: 'gradient'
+  return themeMode.value === 'dark' 
+    ? 'border-slate-850 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/15 shadow-2xl' 
+    : 'border-slate-200 bg-gradient-to-br from-white via-white to-primary/5 shadow-2xl'
+})
+
+const cardRadiusClass = computed(() => {
+  switch (currentStoreCustomization.value.cardRadius) {
+    case 'pill': return 'rounded-3xl'
+    case 'sharp': return 'rounded-lg'
+    case 'rounded':
+    default: return 'rounded-2xl'
+  }
+})
+
 // Cálculo de Subtotal do Carrinho
 const subtotal = computed(() => {
   return cartItems.value.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
 })
 
-// Carrega produtos ao montar a tela
+// Carrega produtos e identidade ao montar a tela
 onMounted(async () => {
   try {
-    products.value = await fetchProducts()
+    const [prods] = await Promise.all([
+      fetchProducts(),
+      fetchStoreCustomization()
+    ])
+    products.value = prods
   } catch (err) {
-    console.error('Erro ao buscar produtos:', err)
+    console.error('Erro ao buscar dados do catálogo:', err)
   } finally {
     isLoading.value = false
   }
@@ -172,49 +228,170 @@ const addAndCloseQuickView = (product: Product) => {
 
 <template>
   <div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <!-- Hero Banner Premium Dinâmico -->
-    <section class="relative overflow-hidden rounded-3xl border transition-colors duration-300 p-8 md:p-12 shadow-2xl"
-      :class="themeMode === 'dark' 
-        ? 'border-slate-850 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/15' 
-        : 'border-slate-200 bg-gradient-to-br from-white via-white to-primary/5'"
+    <!-- Hero Banner Premium Dinâmico Customizável -->
+    <section 
+      class="relative overflow-hidden rounded-3xl border transition-all duration-300 p-8 md:p-12"
+      :class="bannerStyleClass"
+      :style="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+        ? { backgroundImage: `url(${currentStoreCustomization.bannerCoverImage})` } 
+        : {}"
     >
-      <!-- Glow Decorativo no banner -->
-      <div v-if="themeMode === 'dark'" class="absolute inset-0 pointer-events-none opacity-40">
+      <!-- Overlay escuro se estiver usando estilo de Capa para garantir contraste impecável -->
+      <div 
+        v-if="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage"
+        class="absolute inset-0 bg-slate-950/80 backdrop-blur-[1px] z-0"
+      ></div>
+
+      <!-- Glow Decorativo no banner padrão -->
+      <div v-else-if="themeMode === 'dark'" class="absolute inset-0 pointer-events-none opacity-40 z-0">
         <div class="absolute -top-1/2 -right-1/4 w-96 h-96 rounded-full bg-primary/10 blur-[80px]"></div>
       </div>
       
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center relative z-10">
-        <!-- Coluna Texto -->
-        <div class="md:col-span-8 space-y-4 text-left">
-          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
-            :class="themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary'"
+      <!-- Disposição 1: Imagem Centralizada no Topo -->
+      <div 
+        v-if="currentStoreCustomization.bannerImagePosition === 'center'"
+        class="flex flex-col gap-6 relative z-10 w-full"
+        :class="currentStoreCustomization.bannerAlignment === 'left' ? 'text-left items-start' : currentStoreCustomization.bannerAlignment === 'right' ? 'text-right items-end' : 'text-center items-center'"
+      >
+        <!-- Logo Centralizada -->
+        <div class="relative group">
+          <div v-if="themeMode === 'dark'" class="absolute inset-0 bg-primary/25 blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-500" :class="logoShapeClass"></div>
+          
+          <div 
+            class="relative border-4 border-primary shadow-2xl flex items-center justify-center text-white font-black bg-gradient-to-tr from-brand-start to-brand-end transition-all duration-500 group-hover:scale-105 overflow-hidden bg-white/10"
+            :class="[logoShapeClass, logoSizeClass, themeMode === 'dark' ? 'border-primary shadow-primary/10' : 'border-primary/60 shadow-slate-400/20']"
+          >
+            <img 
+              v-if="currentCompany?.image_data" 
+              :src="currentCompany.image_data" 
+              :alt="currentCompany.name"
+              class="w-full h-full object-cover" 
+            />
+            <span v-else>
+              {{ currentCompany?.name ? currentCompany.name.charAt(0) : 'T' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Conteúdo Textual -->
+        <div class="space-y-4 max-w-3xl"
+          :class="currentStoreCustomization.bannerAlignment === 'left' ? 'text-left' : currentStoreCustomization.bannerAlignment === 'right' ? 'text-right' : 'text-center'"
+        >
+          <div 
+            v-if="currentStoreCustomization.bannerShowBadge"
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+            :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
+              ? 'bg-primary/15 border-primary/30 text-primary' 
+              : 'bg-primary/5 border-primary/20 text-primary'"
           >
             <Sparkles class="w-3.5 h-3.5" />
-            {{ currentCompany?.name || 'Catálogo Premium' }}
+            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
           </div>
           
-          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors text-slate-900"
-            :class="themeMode === 'dark' ? 'text-slate-50' : 'text-slate-900'"
+          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
+            :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+              ? 'text-white' 
+              : (themeMode === 'dark' ? 'text-slate-50' : 'text-slate-900')"
           >
             {{ currentCompany?.name }}
           </h1>
           
           <p class="text-sm md:text-base leading-relaxed"
-            :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650'"
+            :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+              ? 'text-slate-200' 
+              : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+          >
+            {{ currentCompany?.description }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Disposição 2: Apenas Texto (Sem Logo no Banner) -->
+      <div 
+        v-else-if="currentStoreCustomization.bannerImagePosition === 'hidden'"
+        class="space-y-4 relative z-10 w-full"
+        :class="currentStoreCustomization.bannerAlignment === 'center' ? 'text-center max-w-3xl mx-auto' : currentStoreCustomization.bannerAlignment === 'right' ? 'text-right' : 'text-left'"
+      >
+        <div 
+          v-if="currentStoreCustomization.bannerShowBadge"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+          :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
+            ? 'bg-primary/15 border-primary/30 text-primary' 
+            : 'bg-primary/5 border-primary/20 text-primary'"
+        >
+          <Sparkles class="w-3.5 h-3.5" />
+          {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
+        </div>
+        
+        <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
+          :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+            ? 'text-white' 
+            : (themeMode === 'dark' ? 'text-slate-50' : 'text-slate-900')"
+        >
+          {{ currentCompany?.name }}
+        </h1>
+        
+        <p class="text-sm md:text-base leading-relaxed"
+          :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+            ? 'text-slate-200' 
+            : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+        >
+          {{ currentCompany?.description }}
+        </p>
+      </div>
+
+      <!-- Disposição 3: Em Grade (Logo na Direita ou Esquerda) -->
+      <div 
+        v-else
+        class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center relative z-10"
+      >
+        <!-- Coluna Texto -->
+        <div 
+          class="md:col-span-8 space-y-4"
+          :class="[
+            currentStoreCustomization.bannerImagePosition === 'left' ? 'md:order-2' : 'md:order-1',
+            currentStoreCustomization.bannerAlignment === 'center' ? 'text-center' : currentStoreCustomization.bannerAlignment === 'right' ? 'text-right' : 'text-left'
+          ]"
+        >
+          <div 
+            v-if="currentStoreCustomization.bannerShowBadge"
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+            :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
+              ? 'bg-primary/15 border-primary/30 text-primary' 
+              : 'bg-primary/5 border-primary/20 text-primary'"
+          >
+            <Sparkles class="w-3.5 h-3.5" />
+            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
+          </div>
+          
+          <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
+            :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+              ? 'text-white' 
+              : (themeMode === 'dark' ? 'text-slate-50' : 'text-slate-900')"
+          >
+            {{ currentCompany?.name }}
+          </h1>
+          
+          <p class="text-sm md:text-base leading-relaxed"
+            :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
+              ? 'text-slate-200' 
+              : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
           >
             {{ currentCompany?.description }}
           </p>
         </div>
 
         <!-- Coluna Logo Integrado -->
-        <div class="md:col-span-4 flex items-center justify-center">
+        <div 
+          class="md:col-span-4 flex items-center justify-center"
+          :class="currentStoreCustomization.bannerImagePosition === 'left' ? 'md:order-1' : 'md:order-2'"
+        >
           <div class="relative group">
-            <!-- Glow externo no dark mode -->
-            <div v-if="themeMode === 'dark'" class="absolute inset-0 rounded-full bg-primary/25 blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div v-if="themeMode === 'dark'" class="absolute inset-0 bg-primary/25 blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-500" :class="logoShapeClass"></div>
             
             <div 
-              class="relative w-36 h-36 md:w-44 md:h-44 rounded-full border-4 border-primary shadow-2xl flex items-center justify-center text-white text-5xl font-black bg-gradient-to-tr from-brand-start to-brand-end transition-all duration-500 group-hover:scale-105 overflow-hidden bg-white/10"
-              :class="themeMode === 'dark' ? 'border-primary shadow-primary/10' : 'border-primary/60 shadow-slate-400/20'"
+              class="relative border-4 border-primary shadow-2xl flex items-center justify-center text-white font-black bg-gradient-to-tr from-brand-start to-brand-end transition-all duration-500 group-hover:scale-105 overflow-hidden bg-white/10"
+              :class="[logoShapeClass, logoSizeClass, themeMode === 'dark' ? 'border-primary shadow-primary/10' : 'border-primary/60 shadow-slate-400/20']"
             >
               <img 
                 v-if="currentCompany?.image_data" 
@@ -288,8 +465,11 @@ const addAndCloseQuickView = (product: Product) => {
       <div 
         v-for="product in filteredProducts" 
         :key="product.id"
-        class="group relative flex flex-col border rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/5 transition-all duration-300 cursor-pointer"
-        :class="themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900 hover:border-slate-800/80' : 'bg-white border-slate-200 hover:border-slate-300'"
+        class="group relative flex flex-col border overflow-hidden hover:shadow-2xl hover:shadow-primary/5 transition-all duration-300 cursor-pointer"
+        :class="[
+          cardRadiusClass,
+          themeMode === 'dark' ? 'bg-slate-900/30 border-slate-900 hover:border-slate-800/80' : 'bg-white border-slate-200 hover:border-slate-300'
+        ]"
         @click="openQuickView(product)"
       >
         <!-- Container da Foto do Produto -->

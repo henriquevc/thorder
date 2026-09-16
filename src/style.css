@@ -10,8 +10,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-sans: 'Geist Variable', sans-serif;
-    --font-heading: var(--font-sans);
+    --font-sans: var(--store-font, 'Geist Variable', sans-serif);
+    --font-heading: var(--store-font, var(--font-sans));
     --color-brand-start: var(--brand-start);
     --color-brand-end: var(--brand-end);
     --color-sidebar-ring: var(--sidebar-ring);

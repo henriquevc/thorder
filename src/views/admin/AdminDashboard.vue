@@ -44,7 +44,20 @@ import {
   Navigation,
   CheckCircle2,
   Calculator,
-  Crop
+  Crop,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Type,
+  LayoutTemplate,
+  ImageIcon,
+  Square,
+  Circle,
+  Sliders,
+  Smartphone,
+  Monitor,
+  Undo2,
+  Layers
 } from 'lucide-vue-next'
 import { 
   type TipoChavePix, 
@@ -89,7 +102,15 @@ import {
   type User,
   type DeliverySettings,
   type DeliveryTier,
-  DEFAULT_DELIVERY_TIERS
+  DEFAULT_DELIVERY_TIERS,
+  AVAILABLE_FONTS,
+  currentStoreCustomization,
+  fetchStoreCustomization,
+  saveStoreCustomization,
+  applyStoreCustomization,
+  DEFAULT_STORE_CUSTOMIZATION,
+  type StoreCustomization,
+  type StoreFontOption
 } from '@/services/store'
 import SuperAdminDashboard from './SuperAdminDashboard.vue'
 import AdminProducts from './AdminProducts.vue'
@@ -645,6 +666,18 @@ const loadStoreData = async () => {
       customHexInput.value = resolveThemeHex(currentCompany.value.theme_color || themeColor.value)
     }
 
+    const customization = await fetchStoreCustomization()
+    customFont.value = customization.fontFamily
+    bannerImagePos.value = customization.bannerImagePosition
+    bannerAlign.value = customization.bannerAlignment
+    logoShape.value = customization.logoShape
+    logoSize.value = customization.logoSize
+    bannerStyle.value = customization.bannerStyle
+    bannerCoverImage.value = customization.bannerCoverImage || ''
+    bannerBadgeText.value = customization.bannerBadgeText || ''
+    bannerShowBadge.value = customization.bannerShowBadge
+    cardRadius.value = customization.cardRadius
+
     await loadStoreUsers()
   } catch (err) {
     console.error('Falha ao obter dados estatísticos:', err)
@@ -698,6 +731,127 @@ const isCompressingLogo = ref(false)
 const saveCompanySuccess = ref(false)
 const saveCompanyError = ref('')
 const copiedUrlType = ref<'subdomain' | 'path' | null>(null)
+
+// Customizações Avançadas da Identidade da Loja
+const customFont = ref(DEFAULT_STORE_CUSTOMIZATION.fontFamily)
+const bannerImagePos = ref<StoreCustomization['bannerImagePosition']>(DEFAULT_STORE_CUSTOMIZATION.bannerImagePosition)
+const bannerAlign = ref<StoreCustomization['bannerAlignment']>(DEFAULT_STORE_CUSTOMIZATION.bannerAlignment)
+const logoShape = ref<StoreCustomization['logoShape']>(DEFAULT_STORE_CUSTOMIZATION.logoShape)
+const logoSize = ref<StoreCustomization['logoSize']>(DEFAULT_STORE_CUSTOMIZATION.logoSize)
+const bannerStyle = ref<StoreCustomization['bannerStyle']>(DEFAULT_STORE_CUSTOMIZATION.bannerStyle)
+const bannerCoverImage = ref('')
+const bannerBadgeText = ref('')
+const bannerShowBadge = ref(true)
+const cardRadius = ref<StoreCustomization['cardRadius']>(DEFAULT_STORE_CUSTOMIZATION.cardRadius)
+const previewDevice = ref<'desktop' | 'mobile'>('desktop')
+
+// Helpers visuais da pré-visualização no Admin
+const previewLogoShapeClass = computed(() => {
+  switch (logoShape.value) {
+    case 'squircle': return 'rounded-3xl'
+    case 'square': return 'rounded-xl'
+    case 'none': return 'rounded-none'
+    case 'circle':
+    default: return 'rounded-full'
+  }
+})
+
+const previewLogoSizeClass = computed(() => {
+  switch (logoSize.value) {
+    case 'sm': return 'w-20 h-20 md:w-24 md:h-24 text-2xl'
+    case 'lg': return 'w-32 h-32 md:w-40 md:h-40 text-5xl'
+    case 'md':
+    default: return 'w-24 h-24 md:w-32 md:h-32 text-3xl'
+  }
+})
+
+const previewBannerStyleClass = computed(() => {
+  if (bannerStyle.value === 'minimal') {
+    return themeMode.value === 'dark' 
+      ? 'border-slate-800 bg-slate-900/60 shadow-md' 
+      : 'border-slate-200 bg-slate-50/90 shadow-sm'
+  }
+  if (bannerStyle.value === 'glass') {
+    return themeMode.value === 'dark' 
+      ? 'border-slate-800/80 bg-slate-950/40 backdrop-blur-xl shadow-2xl' 
+      : 'border-slate-200/80 bg-white/70 backdrop-blur-xl shadow-xl'
+  }
+  if (bannerStyle.value === 'cover' && bannerCoverImage.value) {
+    return 'border-slate-800 shadow-2xl relative bg-cover bg-center'
+  }
+  return themeMode.value === 'dark' 
+    ? 'border-slate-850 bg-gradient-to-br from-slate-900 via-slate-900 to-primary/15 shadow-2xl' 
+    : 'border-slate-200 bg-gradient-to-br from-white via-white to-primary/5 shadow-2xl'
+})
+
+const previewCardRadiusClass = computed(() => {
+  switch (cardRadius.value) {
+    case 'pill': return 'rounded-3xl'
+    case 'sharp': return 'rounded-lg'
+    case 'rounded':
+    default: return 'rounded-2xl'
+  }
+})
+
+const selectFont = (fontId: string) => {
+  customFont.value = fontId
+  applyStoreCustomization({
+    fontFamily: fontId,
+    bannerImagePosition: bannerImagePos.value,
+    bannerAlignment: bannerAlign.value,
+    logoShape: logoShape.value,
+    logoSize: logoSize.value,
+    bannerStyle: bannerStyle.value,
+    bannerCoverImage: bannerCoverImage.value,
+    bannerBadgeText: bannerBadgeText.value,
+    bannerShowBadge: bannerShowBadge.value,
+    cardRadius: cardRadius.value
+  })
+}
+
+const handleBannerCoverChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (file.size > 20 * 1024 * 1024) {
+    saveCompanyError.value = 'A foto de capa é muito grande! Escolha um arquivo de até 20MB.'
+    target.value = ''
+    return
+  }
+
+  saveCompanyError.value = ''
+  try {
+    const compressed = await compressImage(file, 1920, 1080, 0.85)
+    bannerCoverImage.value = compressed
+    bannerStyle.value = 'cover'
+  } catch (err: any) {
+    saveCompanyError.value = 'Falha ao processar foto de capa.'
+  } finally {
+    target.value = ''
+  }
+}
+
+const handleRemoveBannerCover = () => {
+  bannerCoverImage.value = ''
+  if (bannerStyle.value === 'cover') {
+    bannerStyle.value = 'gradient'
+  }
+}
+
+const handleResetCustomization = () => {
+  customFont.value = DEFAULT_STORE_CUSTOMIZATION.fontFamily
+  bannerImagePos.value = DEFAULT_STORE_CUSTOMIZATION.bannerImagePosition
+  bannerAlign.value = DEFAULT_STORE_CUSTOMIZATION.bannerAlignment
+  logoShape.value = DEFAULT_STORE_CUSTOMIZATION.logoShape
+  logoSize.value = DEFAULT_STORE_CUSTOMIZATION.logoSize
+  bannerStyle.value = DEFAULT_STORE_CUSTOMIZATION.bannerStyle
+  bannerCoverImage.value = ''
+  bannerBadgeText.value = ''
+  bannerShowBadge.value = true
+  cardRadius.value = DEFAULT_STORE_CUSTOMIZATION.cardRadius
+  applyStoreCustomization(DEFAULT_STORE_CUSTOMIZATION)
+}
 
 const storeUrls = computed(() => {
   const clean = companySlugEdit.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || currentCompanySlug.value || 'loja'
@@ -831,6 +985,21 @@ const handleSaveCompanyDetails = async () => {
       currentCompany.value = updated
       currentCompanySlug.value = cleanSlug
       companySlugEdit.value = cleanSlug
+
+      // Salva customizações visuais da loja
+      await saveStoreCustomization({
+        fontFamily: customFont.value,
+        bannerImagePosition: bannerImagePos.value,
+        bannerAlignment: bannerAlign.value,
+        logoShape: logoShape.value,
+        logoSize: logoSize.value,
+        bannerStyle: bannerStyle.value,
+        bannerCoverImage: bannerCoverImage.value,
+        bannerBadgeText: bannerBadgeText.value,
+        bannerShowBadge: bannerShowBadge.value,
+        cardRadius: cardRadius.value
+      })
+
       saveCompanySuccess.value = true
       setTimeout(() => {
         saveCompanySuccess.value = false
@@ -1467,6 +1636,757 @@ const formatPrice = (val: number) => {
               />
             </div>
 
+            <!-- ======================================================== -->
+            <!-- 2. TIPOGRAFIA & FONTE DA LOJA -->
+            <!-- ======================================================== -->
+            <div class="space-y-3 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div>
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Type class="w-3.5 h-3.5 text-primary" />
+                    <span>Tipografia &amp; Fonte da Marca</span>
+                  </label>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Selecione a tipografia que melhor expressa o estilo do seu negócio. As fontes são carregadas em alta definição pelo Google Fonts.
+                  </p>
+                </div>
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary self-start sm:self-auto">
+                  {{ customFont }}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <button
+                  v-for="f in AVAILABLE_FONTS"
+                  :key="f.id"
+                  type="button"
+                  class="p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-2 group cursor-pointer"
+                  :class="[
+                    customFont === f.id
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 hover:border-slate-700 hover:bg-slate-900/50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
+                  ]"
+                  @click="selectFont(f.id)"
+                >
+                  <div class="flex items-center justify-between w-full">
+                    <span class="font-bold text-xs" :class="customFont === f.id ? 'text-primary' : (themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800')">
+                      {{ f.name }}
+                    </span>
+                    <span 
+                      v-if="customFont === f.id"
+                      class="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0"
+                    >
+                      <Check class="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                  </div>
+
+                  <div 
+                    class="text-xs truncate"
+                    :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'"
+                    :style="{ fontFamily: `'${f.id}', sans-serif` }"
+                  >
+                    Cardápio &amp; Produtos
+                  </div>
+
+                  <div class="flex items-center justify-between pt-1 border-t border-border/40 w-full">
+                    <span class="text-[9px] font-semibold text-slate-400">
+                      {{ f.badge }}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 3. DISPOSIÇÃO DO BANNER & POSIÇÃO DA FOTO/LOGO -->
+            <!-- ======================================================== -->
+            <div class="space-y-3 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <LayoutTemplate class="w-3.5 h-3.5 text-primary" />
+                  <span>Disposição do Banner &amp; Posição da Foto</span>
+                </label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Escolha onde a foto da loja será posicionada em relação aos textos do banner principal.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <!-- 1. Direita -->
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerImagePos === 'right'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerImagePos = 'right'"
+                >
+                  <div class="w-12 h-7 rounded border border-current flex items-center justify-between px-1.5 opacity-80">
+                    <span class="h-2 w-4 bg-current rounded-sm"></span>
+                    <span class="h-3 w-3 rounded-full border border-current"></span>
+                  </div>
+                  <span class="text-xs">Foto na Direita</span>
+                </button>
+
+                <!-- 2. Esquerda -->
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerImagePos === 'left'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerImagePos = 'left'"
+                >
+                  <div class="w-12 h-7 rounded border border-current flex items-center justify-between px-1.5 opacity-80">
+                    <span class="h-3 w-3 rounded-full border border-current"></span>
+                    <span class="h-2 w-4 bg-current rounded-sm"></span>
+                  </div>
+                  <span class="text-xs">Foto na Esquerda</span>
+                </button>
+
+                <!-- 3. Topo Central -->
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerImagePos === 'center'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerImagePos = 'center'"
+                >
+                  <div class="w-12 h-7 rounded border border-current flex flex-col items-center justify-center gap-0.5 opacity-80">
+                    <span class="h-2.5 w-2.5 rounded-full border border-current"></span>
+                    <span class="h-1.5 w-5 bg-current rounded-sm"></span>
+                  </div>
+                  <span class="text-xs">Topo Centralizado</span>
+                </button>
+
+                <!-- 4. Ocultar Foto -->
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerImagePos === 'hidden'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerImagePos = 'hidden'"
+                >
+                  <div class="w-12 h-7 rounded border border-current flex items-center justify-center opacity-80">
+                    <span class="h-2 w-8 bg-current rounded-sm"></span>
+                  </div>
+                  <span class="text-xs">Ocultar Foto</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 4. ALINHAMENTO DO CONTEÚDO DO BANNER -->
+            <!-- ======================================================== -->
+            <div class="space-y-3 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <AlignLeft class="w-3.5 h-3.5 text-primary" />
+                  <span>Alinhamento dos Textos do Banner</span>
+                </label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Como os títulos e slogans da loja serão alinhados horizontalmente.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerAlign === 'left'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerAlign = 'left'"
+                >
+                  <AlignLeft class="w-4 h-4" />
+                  <span class="text-xs">À Esquerda</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerAlign === 'center'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerAlign = 'center'"
+                >
+                  <AlignCenter class="w-4 h-4" />
+                  <span class="text-xs">Centralizado</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  :class="[
+                    bannerAlign === 'right'
+                      ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary text-primary font-bold'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerAlign = 'right'"
+                >
+                  <AlignRight class="w-4 h-4" />
+                  <span class="text-xs">À Direita</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 5. FORMATO & TAMANHO DO LOGOTIPO NO BANNER -->
+            <!-- ======================================================== -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <!-- Formato da Moldura -->
+              <div class="space-y-2.5">
+                <div>
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Circle class="w-3.5 h-3.5 text-primary" />
+                    <span>Formato da Moldura da Foto</span>
+                  </label>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Estilo de contorno e bordas da imagem no catálogo.
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    :class="[
+                      logoShape === 'circle'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoShape = 'circle'"
+                  >
+                    <div class="w-4 h-4 rounded-full border-2 border-current"></div>
+                    <span>Círculo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    :class="[
+                      logoShape === 'squircle'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoShape = 'squircle'"
+                  >
+                    <div class="w-4 h-4 rounded-lg border-2 border-current"></div>
+                    <span>Squircle</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    :class="[
+                      logoShape === 'square'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoShape = 'square'"
+                  >
+                    <div class="w-4 h-4 rounded-md border-2 border-current"></div>
+                    <span>Quadrado Suave</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    :class="[
+                      logoShape === 'none'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoShape = 'none'"
+                  >
+                    <div class="w-4 h-4 rounded-none border-2 border-current"></div>
+                    <span>Reto / Sem Borda</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tamanho da Logo -->
+              <div class="space-y-2.5">
+                <div>
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Sliders class="w-3.5 h-3.5 text-primary" />
+                    <span>Tamanho do Destaque da Logo</span>
+                  </label>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Proporção visual da foto no cabeçalho do catálogo.
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      logoSize === 'sm'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoSize = 'sm'"
+                  >
+                    Compacto
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      logoSize === 'md'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoSize = 'md'"
+                  >
+                    Equilibrado
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      logoSize === 'lg'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="logoSize = 'lg'"
+                  >
+                    Destaque Forte
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 6. ESTILO DE FUNDO DO BANNER & IMAGEM DE CAPA -->
+            <!-- ======================================================== -->
+            <div class="space-y-4 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <div>
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Layers class="w-3.5 h-3.5 text-primary" />
+                  <span>Estilo Visual &amp; Fundo do Banner</span>
+                </label>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Defina a atmosfera de fundo do banner de destaque do catálogo.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all cursor-pointer text-xs flex flex-col items-center gap-1.5"
+                  :class="[
+                    bannerStyle === 'gradient'
+                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerStyle = 'gradient'"
+                >
+                  <div class="w-8 h-4 rounded bg-gradient-to-r from-primary to-brand-end opacity-80"></div>
+                  <span>Gradiente Marca</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all cursor-pointer text-xs flex flex-col items-center gap-1.5"
+                  :class="[
+                    bannerStyle === 'minimal'
+                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerStyle = 'minimal'"
+                >
+                  <div class="w-8 h-4 rounded border border-slate-400 bg-card opacity-80"></div>
+                  <span>Minimalista Clean</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all cursor-pointer text-xs flex flex-col items-center gap-1.5"
+                  :class="[
+                    bannerStyle === 'glass'
+                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerStyle = 'glass'"
+                >
+                  <div class="w-8 h-4 rounded border border-primary/40 backdrop-blur bg-primary/20"></div>
+                  <span>Glassmorphism</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="p-3 rounded-xl border text-center transition-all cursor-pointer text-xs flex flex-col items-center gap-1.5"
+                  :class="[
+                    bannerStyle === 'cover'
+                      ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                      : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                  ]"
+                  @click="bannerStyle = 'cover'"
+                >
+                  <div class="w-8 h-4 rounded border border-amber-500/50 bg-amber-500/20 flex items-center justify-center">
+                    <ImageIcon class="w-3 h-3 text-amber-500" />
+                  </div>
+                  <span>Foto de Capa</span>
+                </button>
+              </div>
+
+              <!-- Upload de Imagem de Capa do Banner -->
+              <div 
+                class="p-4 rounded-2xl border space-y-3 transition-all"
+                :class="themeMode === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <ImageIcon class="w-3.5 h-3.5 text-primary" />
+                    <span>Foto Panorâmica de Capa (Opcional)</span>
+                  </span>
+                  <span v-if="bannerCoverImage" class="text-[10px] text-emerald-500 font-bold px-2 py-0.5 rounded-full bg-emerald-500/10">
+                    Capa Ativa
+                  </span>
+                </div>
+
+                <div v-if="bannerCoverImage" class="relative rounded-xl overflow-hidden aspect-[21/9] max-h-44 border border-border group">
+                  <img :src="bannerCoverImage" alt="Capa do Banner" class="w-full h-full object-cover" />
+                  <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      class="rounded-xl text-xs font-bold border-red-500/40 text-red-400 hover:bg-red-500/20 bg-black/60"
+                      @click="handleRemoveBannerCover"
+                    >
+                      <Trash2 class="w-3.5 h-3.5 mr-1" />
+                      Remover Foto de Capa
+                    </Button>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                  <label class="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all">
+                    <UploadCloud class="w-4 h-4" />
+                    <span>{{ bannerCoverImage ? 'Substituir Foto de Capa' : 'Enviar Foto de Capa Panorâmica' }}</span>
+                    <input 
+                      type="file" 
+                      accept="image/png, image/jpeg, image/webp" 
+                      class="hidden" 
+                      @change="handleBannerCoverChange" 
+                    />
+                  </label>
+
+                  <Button
+                    v-if="bannerCoverImage"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="rounded-xl text-xs border-red-500/30 text-red-500 hover:bg-red-500/10"
+                    @click="handleRemoveBannerCover"
+                  >
+                    <Trash2 class="w-3.5 h-3.5 mr-1" />
+                    Remover
+                  </Button>
+                </div>
+
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Foto em alta resolução (ex: fachada da loja, ambiente, pratos ou textura). Um overlay escuro inteligente é aplicado automaticamente para manter textos perfeitamente legíveis.
+                </p>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 7. SELO DE DESTAQUE & ARREDONDAMENTO DE CARDS -->
+            <!-- ======================================================== -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <!-- Selo / Badge no Banner -->
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Sparkles class="w-3.5 h-3.5 text-primary" />
+                    <span>Selo de Destaque no Banner</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-xs">
+                    <input type="checkbox" v-model="bannerShowBadge" class="rounded text-primary focus:ring-primary h-4 w-4" />
+                    <span class="text-slate-400 text-[11px]">Exibir</span>
+                  </label>
+                </div>
+
+                <Input 
+                  v-model="bannerBadgeText" 
+                  :disabled="!bannerShowBadge"
+                  placeholder="Ex: Catálogo Oficial, Aberto Hoje, Entrega Rápida..." 
+                  class="rounded-xl w-full text-xs"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-100 border-slate-300 text-slate-900'"
+                />
+                <p class="text-[10px] text-slate-500">
+                  Frase chamativa que fica em uma pílula brilhante acima do nome da loja.
+                </p>
+              </div>
+
+              <!-- Formato dos Cards de Produtos -->
+              <div class="space-y-2.5">
+                <div>
+                  <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Square class="w-3.5 h-3.5 text-primary" />
+                    <span>Cantos dos Cards de Produtos</span>
+                  </label>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Estilo de arredondamento nos cards de catálogo e botões.
+                  </p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      cardRadius === 'rounded'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="cardRadius = 'rounded'"
+                  >
+                    Suave (16px)
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      cardRadius === 'pill'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="cardRadius = 'pill'"
+                  >
+                    Pílula (24px)
+                  </button>
+
+                  <button
+                    type="button"
+                    class="p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer"
+                    :class="[
+                      cardRadius === 'sharp'
+                        ? 'border-primary bg-primary/10 text-primary font-bold ring-1 ring-primary'
+                        : (themeMode === 'dark' ? 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')
+                    ]"
+                    @click="cardRadius = 'sharp'"
+                  >
+                    Reto (8px)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- 8. PRÉ-VISUALIZAÇÃO AO VIVO EM TEMPO REAL -->
+            <!-- ======================================================== -->
+            <div class="space-y-3 pt-4 border-t" :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-200'">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Eye class="w-3.5 h-3.5 text-primary" />
+                    <span>Pré-Visualização em Tempo Real da sua Loja</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Veja exatamente como seu catálogo ficará para os clientes com as cores, fontes e alinhamentos escolhidos.
+                  </p>
+                </div>
+
+                <!-- Seletor de Dispositivo (Desktop x Mobile) -->
+                <div class="flex items-center gap-1 p-1 rounded-xl border self-start sm:self-auto shrink-0"
+                  :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'"
+                >
+                  <button
+                    type="button"
+                    class="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                    :class="previewDevice === 'desktop' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+                    @click="previewDevice = 'desktop'"
+                  >
+                    <Monitor class="w-3.5 h-3.5" />
+                    <span>Computador</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                    :class="previewDevice === 'mobile' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+                    @click="previewDevice = 'mobile'"
+                  >
+                    <Smartphone class="w-3.5 h-3.5" />
+                    <span>Celular</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Container da Janela de Pré-Visualização -->
+              <div 
+                class="p-4 sm:p-6 rounded-2xl border transition-all duration-300"
+                :class="[
+                  themeMode === 'dark' ? 'bg-slate-950/80 border-slate-800/80' : 'bg-slate-100/70 border-slate-200',
+                  previewDevice === 'mobile' ? 'max-w-sm mx-auto' : 'w-full'
+                ]"
+                :style="{ fontFamily: `'${customFont}', sans-serif` }"
+              >
+                <!-- Mockup do Banner Hero -->
+                <div 
+                  class="relative overflow-hidden rounded-2xl border p-5 sm:p-7 shadow-lg transition-all duration-300"
+                  :class="previewBannerStyleClass"
+                  :style="bannerStyle === 'cover' && bannerCoverImage ? { backgroundImage: `url(${bannerCoverImage})` } : {}"
+                >
+                  <!-- Overlay se estilo capa -->
+                  <div 
+                    v-if="bannerStyle === 'cover' && bannerCoverImage"
+                    class="absolute inset-0 bg-slate-950/80 backdrop-blur-[1px] z-0"
+                  ></div>
+
+                  <!-- Disposição: Topo Central -->
+                  <div 
+                    v-if="bannerImagePos === 'center'"
+                    class="flex flex-col gap-4 relative z-10 w-full"
+                    :class="bannerAlign === 'left' ? 'text-left items-start' : bannerAlign === 'right' ? 'text-right items-end' : 'text-center items-center'"
+                  >
+                    <div 
+                      class="relative border-2 border-primary shadow-lg flex items-center justify-center text-white font-black bg-gradient-to-tr from-brand-start to-brand-end overflow-hidden"
+                      :class="[previewLogoShapeClass, previewLogoSizeClass]"
+                    >
+                      <img v-if="companyLogoEdit" :src="companyLogoEdit" alt="Logo" class="w-full h-full object-cover" />
+                      <span v-else>{{ companyNameEdit ? companyNameEdit.charAt(0) : 'L' }}</span>
+                    </div>
+
+                    <div class="space-y-2">
+                      <div 
+                        v-if="bannerShowBadge"
+                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'bg-primary/20 border-primary/40 text-primary' : (themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary')"
+                      >
+                        <Sparkles class="w-2.5 h-2.5" />
+                        {{ bannerBadgeText || companyNameEdit || 'Catálogo Oficial' }}
+                      </div>
+                      <h2 class="text-xl sm:text-2xl font-black tracking-tight"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-white' : (themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900')"
+                      >
+                        {{ companyNameEdit || 'Nome da sua Loja' }}
+                      </h2>
+                      <p class="text-xs leading-relaxed max-w-md"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-slate-200' : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600')"
+                      >
+                        {{ companyDescEdit || 'Slogan ou breve descrição apresentando seus produtos e especialidades.' }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Disposição: Ocultar Foto -->
+                  <div 
+                    v-else-if="bannerImagePos === 'hidden'"
+                    class="space-y-2 relative z-10 w-full"
+                    :class="bannerAlign === 'center' ? 'text-center' : bannerAlign === 'right' ? 'text-right' : 'text-left'"
+                  >
+                    <div 
+                      v-if="bannerShowBadge"
+                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border"
+                      :class="bannerStyle === 'cover' && bannerCoverImage ? 'bg-primary/20 border-primary/40 text-primary' : (themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary')"
+                    >
+                      <Sparkles class="w-2.5 h-2.5" />
+                      {{ bannerBadgeText || companyNameEdit || 'Catálogo Oficial' }}
+                    </div>
+                    <h2 class="text-xl sm:text-2xl font-black tracking-tight"
+                      :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-white' : (themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900')"
+                    >
+                      {{ companyNameEdit || 'Nome da sua Loja' }}
+                    </h2>
+                    <p class="text-xs leading-relaxed max-w-lg"
+                      :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-slate-200' : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+                    >
+                      {{ companyDescEdit || 'Slogan ou breve descrição apresentando seus produtos e especialidades.' }}
+                    </p>
+                  </div>
+
+                  <!-- Disposição: Foto na Direita ou na Esquerda -->
+                  <div 
+                    v-else
+                    class="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 relative z-10"
+                    :class="bannerImagePos === 'left' ? 'sm:flex-row' : 'sm:flex-row-reverse'"
+                  >
+                    <!-- Foto / Logo -->
+                    <div class="shrink-0">
+                      <div 
+                        class="relative border-2 border-primary shadow-lg flex items-center justify-center text-white font-black bg-gradient-to-tr from-brand-start to-brand-end overflow-hidden"
+                        :class="[previewLogoShapeClass, previewLogoSizeClass]"
+                      >
+                        <img v-if="companyLogoEdit" :src="companyLogoEdit" alt="Logo" class="w-full h-full object-cover" />
+                        <span v-else>{{ companyNameEdit ? companyNameEdit.charAt(0) : 'L' }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Textos -->
+                    <div 
+                      class="space-y-2 flex-1 w-full"
+                      :class="bannerAlign === 'center' ? 'text-center' : bannerAlign === 'right' ? 'text-right' : 'text-left'"
+                    >
+                      <div 
+                        v-if="bannerShowBadge"
+                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'bg-primary/20 border-primary/40 text-primary' : (themeMode === 'dark' ? 'bg-primary/15 border-primary/30 text-primary' : 'bg-primary/5 border-primary/20 text-primary')"
+                      >
+                        <Sparkles class="w-2.5 h-2.5" />
+                        {{ bannerBadgeText || companyNameEdit || 'Catálogo Oficial' }}
+                      </div>
+                      <h2 class="text-xl sm:text-2xl font-black tracking-tight"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-white' : (themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900')"
+                      >
+                        {{ companyNameEdit || 'Nome da sua Loja' }}
+                      </h2>
+                      <p class="text-xs leading-relaxed"
+                        :class="bannerStyle === 'cover' && bannerCoverImage ? 'text-slate-200' : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+                      >
+                        {{ companyDescEdit || 'Slogan ou breve descrição apresentando seus produtos e especialidades.' }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Amostra de Card de Produto com o cardRadius escolhido -->
+                <div class="mt-4 pt-4 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div class="text-[11px] text-slate-400">
+                    Amostra de Card de Produto: <strong class="text-slate-200 capitalize font-mono">{{ cardRadius }}</strong>
+                  </div>
+
+                  <div 
+                    class="p-3 border flex items-center gap-3 w-full sm:w-auto shadow-sm"
+                    :class="[previewCardRadiusClass, themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200']"
+                  >
+                    <div class="w-10 h-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-xs">
+                      PROD
+                    </div>
+                    <div class="text-left text-xs">
+                      <div class="font-bold">Produto de Demonstração</div>
+                      <div class="text-[10px] text-primary font-bold">R$ 49,90</div>
+                    </div>
+                    <Button size="sm" class="h-7 text-[11px] rounded-lg bg-primary text-primary-foreground font-bold ml-auto">
+                      Comprar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Alertas de Feedback da Identidade -->
             <div v-if="saveCompanyError" class="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-red-400 text-xs flex items-center gap-2 animate-shake">
               <AlertCircle class="w-4 h-4 shrink-0" />
@@ -1478,15 +2398,27 @@ const formatPrice = (val: number) => {
               <span>Identidade e foto da loja atualizadas com sucesso!</span>
             </div>
 
-            <!-- Botão Salvar Identidade -->
-            <div class="flex justify-end pt-2">
+            <!-- Botões de Ação Final -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3">
               <Button 
-                class="rounded-xl bg-primary text-primary-foreground font-bold"
+                type="button" 
+                variant="outline" 
+                size="sm"
+                class="rounded-xl text-xs font-semibold flex items-center gap-1.5 w-full sm:w-auto"
+                @click="handleResetCustomization"
+              >
+                <Undo2 class="w-3.5 h-3.5" />
+                <span>Restaurar Padrões</span>
+              </Button>
+
+              <Button 
+                class="rounded-xl bg-primary text-primary-foreground font-bold w-full sm:w-auto"
                 :disabled="isSavingCompany || isCompressingLogo"
                 @click="handleSaveCompanyDetails"
               >
                 <Loader2 v-if="isSavingCompany" class="w-4 h-4 animate-spin mr-1.5" />
-                <span>Salvar Identidade</span>
+                <Check v-else class="w-4 h-4 mr-1.5" />
+                <span>Salvar Identidade Visual</span>
               </Button>
             </div>
           </CardContent>

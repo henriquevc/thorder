@@ -1290,7 +1290,7 @@ const formatPrice = (val: number) => {
             <p class="text-[10px] text-slate-400 mt-1 flex items-center gap-1"
               :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-550'"
             >
-              <span class="text-emerald-500 font-bold">100% online</span> com Turso
+              <span class="text-emerald-500 font-bold">100% online</span>
             </p>
           </div>
           <div class="w-12 h-12 rounded-xl bg-emerald-955/40 border border-emerald-500/20 text-emerald-500 flex items-center justify-center">

@@ -336,15 +336,15 @@ const handleSubmitOrder = async () => {
     <!-- Cabeçalho -->
     <div class="flex items-center justify-between">
       <div class="space-y-1">
-        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-850 flex items-center gap-2">
-          <CreditCard class="w-6 h-6 text-primary" />
+        <h1 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-slate-850 flex items-center gap-2.5">
+          <CreditCard class="w-7 h-7 text-primary" />
           Finalizar Pedido
         </h1>
-        <p class="text-slate-500 text-xs md:text-sm">
+        <p class="text-slate-600 dark:text-slate-400 text-sm md:text-base">
           Preencha suas informações de contato e endereço para entrega do seu pacote.
         </p>
       </div>
-      <router-link :to="currentCompanySlug ? `/${currentCompanySlug}/carrinho` : '/carrinho'" class="text-xs md:text-sm font-bold text-primary hover:opacity-80 flex items-center gap-1 group">
+      <router-link :to="currentCompanySlug ? `/${currentCompanySlug}/carrinho` : '/carrinho'" class="text-sm md:text-base font-bold text-primary hover:opacity-80 flex items-center gap-1.5 group">
         <ArrowLeft class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
         Voltar ao carrinho
       </router-link>
@@ -354,8 +354,8 @@ const handleSubmitOrder = async () => {
     <div v-if="!isStoreOpen" class="p-4.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 flex items-start gap-3 animate-in fade-in duration-300">
       <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
       <div>
-        <h4 class="font-extrabold text-sm text-amber-600">Loja Fechada no Momento</h4>
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+        <h4 class="font-extrabold text-base text-amber-600">Loja Fechada no Momento</h4>
+        <p class="text-sm text-slate-600 mt-1 leading-relaxed">
           Nosso horário de funcionamento é das <strong>{{ storeOpenTime }}</strong> às <strong>{{ storeCloseTime }}</strong>. Você não conseguirá finalizar sua compra no momento. Agradecemos a sua compreensão!
         </p>
       </div>
@@ -367,36 +367,27 @@ const handleSubmitOrder = async () => {
         <!-- 1. Informações de Contato -->
         <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm">
           <CardHeader class="pb-3 border-b border-slate-100">
-            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">1</span>
+            <CardTitle class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">1</span>
               Dados de Contato
             </CardTitle>
           </CardHeader>
-          <CardContent class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="space-y-1.5 md:col-span-2">
-              <label class="text-xs font-semibold text-slate-500">Nome Completo</label>
+          <CardContent class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="space-y-2 md:col-span-2">
+              <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Nome Completo</label>
               <Input 
                 v-model="customerName"
                 placeholder="Ex: Henrique Souza"
-                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
               />
             </div>
-            <!-- <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-slate-500">E-mail</label>
-              <Input 
-                v-model="customerEmail"
-                type="email"
-                placeholder="Ex: henrique@exemplo.com"
-                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
-              />
-            </div> -->
-            <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-slate-500">Celular (com DDD)</label>
+            <div class="space-y-2">
+              <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Celular (com DDD)</label>
               <Input 
                 v-model="customerPhone"
                 maxLength="15"
                 placeholder="Ex: (16) 99999-9999"
-                class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
               />
             </div>
           </CardContent>
@@ -405,25 +396,25 @@ const handleSubmitOrder = async () => {
         <!-- 2. Endereço de Entrega ou Retirada -->
         <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm transition-all duration-300">
           <CardHeader class="pb-3 border-b border-slate-100">
-            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">2</span>
+            <CardTitle class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">2</span>
               {{ isPickup ? 'Retirada do Pedido' : 'Endereço para Entrega' }}
             </CardTitle>
           </CardHeader>
           <CardContent class="p-6 space-y-4">
             <!-- Caso seja Retirada -->
             <div v-if="isPickup" class="space-y-4 py-2">
-              <div class="p-4 rounded-xl bg-primary/5 border border-primary/20 text-slate-800 space-y-2">
-                <h4 class="font-extrabold text-sm flex items-center gap-1.5 text-primary">
-                  <Truck class="w-4 h-4" />
+              <div class="p-5 rounded-xl bg-primary/5 border border-primary/20 text-slate-800 space-y-2.5">
+                <h4 class="font-extrabold text-base md:text-lg flex items-center gap-2 text-primary">
+                  <Truck class="w-5 h-5" />
                   Opção de Retirada na Loja Ativa
                 </h4>
-                <p class="text-xs text-slate-500 leading-relaxed">
+                <p class="text-sm text-slate-600 leading-relaxed">
                   Você escolheu retirar os produtos pessoalmente. Não é necessário preencher dados de entrega física.
                 </p>
-                <div class="border-t border-primary/10 pt-2 mt-2">
-                  <span class="text-[10px] uppercase font-bold text-primary tracking-wider">Endereço da Tabacaria</span>
-                  <p class="text-xs font-bold text-slate-900 mt-0.5">
+                <div class="border-t border-primary/10 pt-3 mt-2">
+                  <span class="text-xs uppercase font-bold text-primary tracking-wider">Endereço da Loja</span>
+                  <p class="text-sm md:text-base font-bold text-slate-900 mt-1">
                     {{ selectedShipping?.carrier.replace('Retirada na Loja (', '').replace(')', '') }}
                   </p>
                 </div>
@@ -431,72 +422,72 @@ const handleSubmitOrder = async () => {
             </div>
 
             <!-- Caso seja Entrega -->
-            <div v-else class="space-y-4">
-              <div v-if="isFetchingCep" class="text-xs text-primary flex items-center gap-2 animate-pulse py-1">
-                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+            <div v-else class="space-y-5">
+              <div v-if="isFetchingCep" class="text-sm text-primary flex items-center gap-2 animate-pulse py-1">
+                <Loader2 class="w-4 h-4 animate-spin" />
                 <span>Buscando CEP via ViaCEP...</span>
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-500">CEP</label>
+                <div class="space-y-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">CEP</label>
                   <Input 
                     v-model="shippingCep"
                     disabled
-                    class="bg-slate-50 border-slate-200 text-slate-500 rounded-xl cursor-not-allowed"
+                    class="h-11 text-sm md:text-base bg-slate-50 border-slate-200 text-slate-500 rounded-xl cursor-not-allowed font-medium"
                   />
                 </div>
-                <div class="space-y-1.5 md:col-span-2">
-                  <label class="text-xs font-semibold text-slate-500">Logradouro (Rua/Avenida)</label>
+                <div class="space-y-2 md:col-span-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Logradouro (Rua/Avenida)</label>
                   <Input 
                     v-model="addressStreet"
                     placeholder="Ex: Avenida Paulista"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-500">Número</label>
+                <div class="space-y-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Número</label>
                   <Input 
                     v-model="addressNumber"
                     placeholder="Ex: 1000"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
-                <div class="space-y-1.5 md:col-span-2">
-                  <label class="text-xs font-semibold text-slate-500">Complemento (Opcional)</label>
+                <div class="space-y-2 md:col-span-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Complemento (Opcional)</label>
                   <Input 
                     v-model="addressComplement"
                     placeholder="Ex: Apto 101, Bloco B"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-500">Bairro</label>
+                <div class="space-y-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Bairro</label>
                   <Input 
                     v-model="addressNeighborhood"
                     placeholder="Ex: Bela Vista"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-500">Cidade</label>
+                <div class="space-y-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Cidade</label>
                   <Input 
                     v-model="addressCity"
                     placeholder="Ex: São Paulo"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
-                <div class="space-y-1.5">
-                  <label class="text-xs font-semibold text-slate-500">Estado</label>
+                <div class="space-y-2">
+                  <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Estado</label>
                   <Input 
                     v-model="addressState"
                     placeholder="Ex: SP"
-                    class="bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
+                    class="h-11 text-sm md:text-base bg-white border-slate-350 text-slate-900 rounded-xl placeholder:text-slate-400 focus-visible:ring-primary"
                   />
                 </div>
               </div>
@@ -507,71 +498,71 @@ const handleSubmitOrder = async () => {
         <!-- 3. Forma de Pagamento -->
         <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm">
           <CardHeader class="pb-3 border-b border-slate-100">
-            <CardTitle class="text-base font-bold text-slate-800 flex items-center gap-2">
-              <span class="w-5 h-5 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">3</span>
+            <CardTitle class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2.5">
+              <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">3</span>
               Forma de Pagamento
             </CardTitle>
           </CardHeader>
-          <CardContent class="p-6 space-y-5">
+          <CardContent class="p-6 space-y-6">
             <!-- Grid de Seleção de Pagamento -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <!-- Opção Pix -->
               <button 
                 type="button"
-                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                class="flex flex-col items-center gap-3 p-4.5 rounded-xl border-2 text-center transition-all cursor-pointer group"
                 :class="paymentMethod === 'pix' 
                   ? 'border-primary bg-primary/5 text-primary shadow-sm' 
                   : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
                 @click="paymentMethod = 'pix'"
               >
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
                   :class="paymentMethod === 'pix' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
                 >
-                  <QrCode class="w-5 h-5" />
+                  <QrCode class="w-6 h-6" />
                 </div>
-                <div class="space-y-0.5">
-                  <span class="text-xs font-bold block">Pix</span>
-                  <span class="text-[9px] text-slate-400 block font-medium">QR Code na tela</span>
+                <div class="space-y-1">
+                  <span class="text-sm md:text-base font-bold block">Pix</span>
+                  <span class="text-xs text-slate-500 block font-medium">QR Code na tela</span>
                 </div>
               </button>
 
               <!-- Opção Cartão -->
               <button 
                 type="button"
-                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                class="flex flex-col items-center gap-3 p-4.5 rounded-xl border-2 text-center transition-all cursor-pointer group"
                 :class="paymentMethod === 'cartao' 
                   ? 'border-primary bg-primary/5 text-primary shadow-sm' 
                   : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
                 @click="paymentMethod = 'cartao'"
               >
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
                   :class="paymentMethod === 'cartao' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
                 >
-                  <CreditCard class="w-5 h-5" />
+                  <CreditCard class="w-6 h-6" />
                 </div>
-                <div class="space-y-0.5">
-                  <span class="text-xs font-bold block">Cartão</span>
-                  <span class="text-[9px] text-slate-400 block font-medium">Maquininha na Entrega</span>
+                <div class="space-y-1">
+                  <span class="text-sm md:text-base font-bold block">Cartão</span>
+                  <span class="text-xs text-slate-500 block font-medium">Maquininha na Entrega</span>
                 </div>
               </button>
 
               <!-- Opção Dinheiro -->
               <button 
                 type="button"
-                class="flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 text-center transition-all cursor-pointer group"
+                class="flex flex-col items-center gap-3 p-4.5 rounded-xl border-2 text-center transition-all cursor-pointer group"
                 :class="paymentMethod === 'dinheiro' 
                   ? 'border-primary bg-primary/5 text-primary shadow-sm' 
                   : 'border-slate-200 hover:border-slate-300 text-slate-655 bg-white'"
                 @click="paymentMethod = 'dinheiro'"
               >
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors"
                   :class="paymentMethod === 'dinheiro' ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
                 >
-                  <Coins class="w-5 h-5" />
+                  <Coins class="w-6 h-6" />
                 </div>
-                <div class="space-y-0.5">
-                  <span class="text-xs font-bold block">Dinheiro</span>
-                  <span class="text-[9px] text-slate-400 block font-medium">Pagar na Entrega/Retirada</span>
+                <div class="space-y-1">
+                  <span class="text-sm md:text-base font-bold block">Dinheiro</span>
+                  <span class="text-xs text-slate-500 block font-medium">Pagar na Entrega/Retirada</span>
                 </div>
               </button>
             </div>
@@ -579,16 +570,16 @@ const handleSubmitOrder = async () => {
             <!-- Opções Condicionais de Dinheiro (Troco) -->
             <div 
               v-if="paymentMethod === 'dinheiro'" 
-              class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300"
+              class="p-4.5 rounded-xl border border-slate-200 bg-slate-50 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-300"
             >
               <div class="flex items-center gap-2.5 cursor-pointer select-none">
                 <input 
                   id="needs-change-checkbox"
                   v-model="needsChange"
                   type="checkbox"
-                  class="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary cursor-pointer"
+                  class="w-4.5 h-4.5 text-primary rounded border-slate-300 focus:ring-primary cursor-pointer"
                 />
-                <label for="needs-change-checkbox" class="text-xs font-bold text-slate-650 cursor-pointer flex-1">
+                <label for="needs-change-checkbox" class="text-sm font-bold text-slate-700 cursor-pointer flex-1">
                   Preciso de troco
                 </label>
               </div>
@@ -596,22 +587,22 @@ const handleSubmitOrder = async () => {
               <!-- Input de valor de troco -->
               <div 
                 v-if="needsChange" 
-                class="space-y-1.5 pt-1 max-w-xs animate-in fade-in slide-in-from-top-1 duration-200"
+                class="space-y-2 pt-1 max-w-sm animate-in fade-in slide-in-from-top-1 duration-200"
               >
-                <label class="text-[10px] uppercase font-bold text-slate-450 tracking-wider">Troco para quanto?</label>
+                <label class="text-xs uppercase font-bold text-slate-600 tracking-wider">Troco para quanto?</label>
                 <div class="relative rounded-xl shadow-xs">
-                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <span class="text-xs text-slate-400 font-bold">R$</span>
+                  <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <span class="text-sm text-slate-500 font-bold">R$</span>
                   </div>
                   <Input 
                     v-model.number="changeFor"
                     type="number"
                     step="0.01"
                     placeholder="Ex: 100.00"
-                    class="bg-white border-slate-350 text-slate-900 text-xs rounded-xl pl-9 focus-visible:ring-primary font-bold"
+                    class="h-11 bg-white border-slate-350 text-slate-900 text-sm md:text-base rounded-xl pl-10 focus-visible:ring-primary font-bold"
                   />
                 </div>
-                <p class="text-[9px] text-slate-450">
+                <p class="text-xs text-slate-500 leading-relaxed">
                   Preencha o valor em dinheiro com o qual vai pagar. Nós calcularemos o troco automaticamente.
                 </p>
               </div>
@@ -623,66 +614,66 @@ const handleSubmitOrder = async () => {
       <!-- Resumo e Ação (1 Coluna) -->
       <div class="space-y-4">
         <!-- Detalhes do Frete -->
-        <Card v-if="selectedShipping" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex items-center gap-3">
-          <Truck class="w-5 h-5 text-primary shrink-0" />
-          <div class="text-xs">
-            <h5 class="font-bold text-slate-800">{{ selectedShipping.carrier.startsWith('Retirada') ? selectedShipping.carrier : 'Entrega: ' + selectedShipping.carrier }}</h5>
-            <p class="text-slate-500 mt-0.5">Prazo estimado de entrega: {{ selectedShipping.deliveryDays }} {{ selectedShipping.deliveryDays === 1 ? 'dia útil' : 'dias úteis' }}.</p>
+        <Card v-if="selectedShipping" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex items-center gap-3.5">
+          <Truck class="w-6 h-6 text-primary shrink-0" />
+          <div class="text-sm">
+            <h5 class="font-bold text-slate-850 text-sm md:text-base leading-snug">{{ selectedShipping.carrier.startsWith('Retirada') ? selectedShipping.carrier : 'Entrega: ' + selectedShipping.carrier }}</h5>
+            <p class="text-slate-600 text-xs md:text-sm mt-0.5">Prazo estimado: {{ selectedShipping.deliveryDays }} {{ selectedShipping.deliveryDays === 1 ? 'dia útil' : 'dias úteis' }}.</p>
           </div>
         </Card>
 
         <!-- Resumo do Pedido -->
         <Card class="bg-white border border-slate-200 rounded-2xl shadow-sm sticky top-24">
           <CardHeader class="pb-3 border-b border-slate-100">
-            <CardTitle class="text-base font-bold text-slate-800">Resumo do Pedido</CardTitle>
+            <CardTitle class="text-lg md:text-xl font-bold text-slate-800">Resumo do Pedido</CardTitle>
           </CardHeader>
           <CardContent class="p-6 space-y-6">
-            <!-- Lista reduzida dos itens -->
-            <div class="max-h-40 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200 text-xs">
+            <!-- Lista dos itens -->
+            <div class="max-h-56 overflow-y-auto space-y-3.5 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
               <div 
                 v-for="item in cartItems" 
                 :key="item.product.id"
-                class="flex items-center justify-between gap-3 text-slate-500"
+                class="flex items-center justify-between gap-3 text-slate-600"
               >
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="font-bold text-primary shrink-0">{{ item.quantity }}x</span>
-                  <span class="truncate text-slate-700 font-medium">{{ item.product.name }}</span>
+                <div class="flex items-center gap-2.5 min-w-0">
+                  <span class="font-black text-primary text-sm md:text-base shrink-0">{{ item.quantity }}x</span>
+                  <span class="truncate text-slate-800 font-medium text-sm md:text-base">{{ item.product.name }}</span>
                 </div>
-                <span class="shrink-0 font-semibold text-slate-800">{{ formatPrice(item.product.price * item.quantity) }}</span>
+                <span class="shrink-0 font-bold text-slate-900 text-sm md:text-base">{{ formatPrice(item.product.price * item.quantity) }}</span>
               </div>
             </div>
 
             <!-- Seção de Cupom de Desconto -->
-            <div class="space-y-2.5 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Cupom de Desconto</span>
+            <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span class="text-xs text-slate-600 font-bold uppercase tracking-wider block">Cupom de Desconto</span>
               
               <div v-if="!appliedCoupon" class="flex gap-2">
                 <Input 
                   v-model="couponCode"
                   placeholder="Ex: BEMVINDO10"
-                  class="bg-white border-slate-300 text-slate-900 text-xs placeholder:text-slate-400 rounded-lg h-9 focus-visible:ring-primary uppercase font-bold"
+                  class="bg-white border-slate-300 text-slate-900 text-sm placeholder:text-slate-400 rounded-lg h-10 focus-visible:ring-primary uppercase font-bold"
                   @keyup.enter="handleApplyCoupon"
                   :disabled="isApplyingCoupon"
                 />
                 <Button 
                   size="sm"
-                  class="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-9 shrink-0 text-xs px-4"
+                  class="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-10 shrink-0 text-sm px-4.5"
                   :disabled="isApplyingCoupon"
                   @click="handleApplyCoupon"
                 >
-                  <Loader2 v-if="isApplyingCoupon" class="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 v-if="isApplyingCoupon" class="w-4 h-4 animate-spin" />
                   <span v-else>Aplicar</span>
                 </Button>
               </div>
               
               <!-- Cupom Aplicado -->
-              <div v-else class="flex items-center justify-between bg-emerald-50 border border-emerald-250 p-2.5 rounded-lg text-xs">
-                <div class="flex items-center gap-1.5 font-semibold text-emerald-700">
-                  <CheckCircle class="w-4 h-4 shrink-0 text-emerald-600" />
+              <div v-else class="flex items-center justify-between bg-emerald-50 border border-emerald-250 p-3 rounded-lg text-sm">
+                <div class="flex items-center gap-2 font-semibold text-emerald-700">
+                  <CheckCircle class="w-4.5 h-4.5 shrink-0 text-emerald-600" />
                   <span>Cupom: <strong class="font-black text-emerald-850">{{ appliedCoupon.code }}</strong></span>
                 </div>
                 <button 
-                  class="text-xs text-red-500 hover:text-red-700 font-bold px-1 cursor-pointer transition-colors"
+                  class="text-sm text-red-500 hover:text-red-700 font-bold px-1.5 cursor-pointer transition-colors"
                   @click="handleRemoveCoupon"
                 >
                   Remover
@@ -690,12 +681,12 @@ const handleSubmitOrder = async () => {
               </div>
 
               <!-- Mensagens de Feedback -->
-              <div v-if="couponError" class="text-[10px] text-red-500 font-semibold flex items-center gap-1 mt-1 animate-shake">
-                <AlertTriangle class="w-3.5 h-3.5 shrink-0 text-red-500" />
+              <div v-if="couponError" class="text-xs text-red-500 font-semibold flex items-center gap-1.5 mt-1 animate-shake">
+                <AlertTriangle class="w-4 h-4 shrink-0 text-red-500" />
                 <span>{{ couponError }}</span>
               </div>
-              <div v-if="couponSuccess" class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
-                <CheckCircle class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+              <div v-if="couponSuccess" class="text-xs text-emerald-600 font-semibold flex items-center gap-1.5 mt-1">
+                <CheckCircle class="w-4 h-4 shrink-0 text-emerald-500" />
                 <span>{{ couponSuccess }}</span>
               </div>
             </div>
@@ -704,51 +695,51 @@ const handleSubmitOrder = async () => {
             <div class="border-t border-slate-100 my-2"></div>
 
             <!-- Custos Finais -->
-            <div class="space-y-2.5 text-xs md:text-sm">
-              <div class="flex justify-between text-slate-500">
+            <div class="space-y-3 text-sm md:text-base">
+              <div class="flex justify-between text-slate-600">
                 <span>Subtotal Itens</span>
-                <span class="font-semibold text-slate-750">{{ formatPrice(itemsCost) }}</span>
+                <span class="font-semibold text-slate-800">{{ formatPrice(itemsCost) }}</span>
               </div>
 
               <!-- Linha de Desconto do Cupom -->
-              <div v-if="appliedCoupon" class="flex justify-between text-red-600 font-medium">
+              <div v-if="appliedCoupon" class="flex justify-between text-red-600 font-semibold">
                 <span>Desconto (Cupom: {{ appliedCoupon.code }})</span>
                 <span class="font-bold">- {{ formatPrice(discountAmount) }}</span>
               </div>
 
-              <div class="flex justify-between text-slate-500">
+              <div class="flex justify-between text-slate-600">
                 <span>Taxa de Entrega</span>
-                <span class="font-semibold text-slate-750">{{ formatPrice(shippingCost) }}</span>
+                <span class="font-semibold text-slate-800">{{ formatPrice(shippingCost) }}</span>
               </div>
               
-              <div class="border-t border-slate-100 my-2"></div>
+              <div class="border-t border-slate-100 my-3"></div>
               
               <div class="flex justify-between items-baseline">
-                <span class="font-bold text-slate-800">Total Geral</span>
-                <span class="font-black text-xl text-slate-900">
+                <span class="font-bold text-slate-800 text-base md:text-lg">Total Geral</span>
+                <span class="font-black text-2xl md:text-3xl text-primary">
                   {{ formatPrice(totalCost) }}
                 </span>
               </div>
             </div>
 
             <!-- Feedbacks e Erros -->
-            <div v-if="submitError" class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-xs flex items-center gap-2 animate-shake">
-              <AlertTriangle class="w-4 h-4 shrink-0" />
+            <div v-if="submitError" class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm flex items-center gap-2 animate-shake">
+              <AlertTriangle class="w-4.5 h-4.5 shrink-0" />
               <span>{{ submitError }}</span>
             </div>
 
             <!-- Botão de Finalizar -->
             <Button 
-              class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5 shadow-lg shadow-primary/20 flex items-center justify-center gap-1.5"
+              class="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold py-5.5 text-base md:text-lg shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
               :disabled="isSubmitting || !isStoreOpen"
               @click="handleSubmitOrder"
             >
-              <Loader2 v-if="isSubmitting" class="w-4 h-4 animate-spin mr-1" />
+              <Loader2 v-if="isSubmitting" class="w-5 h-5 animate-spin mr-1" />
               <span>{{ isSubmitting ? 'Processando Pedido...' : 'Confirmar &amp; Pagar' }}</span>
             </Button>
 
             <!-- Proteção de Compra -->
-            <div class="text-[10px] text-slate-400 text-center leading-relaxed">
+            <div class="text-xs text-slate-500 text-center leading-relaxed">
               Pagamento simulado. Os produtos não serão enviados de fato. Pedido será registrado na tabela `orders` do Turso DB.
             </div>
           </CardContent>

@@ -283,6 +283,11 @@ export function getStoreUrls(slug: string): {
 export function clearCurrentCompanySlug() {
   currentCompanySlug.value = '';
   currentCompany.value = null;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem('thorder_active_store_slug');
+    } catch (e) {}
+  }
   setThemeColor('purple'); // Tema neutro da Landing Page
   currentStoreCustomization.value = { ...DEFAULT_STORE_CUSTOMIZATION };
   applyStoreCustomization(DEFAULT_STORE_CUSTOMIZATION);
@@ -290,6 +295,11 @@ export function clearCurrentCompanySlug() {
 
 export async function setCurrentCompanySlug(slug: string) {
   currentCompanySlug.value = slug;
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem('thorder_active_store_slug', slug);
+    } catch (e) {}
+  }
   const company = await fetchCompanyBySlug(slug);
   if (company) {
     currentCompany.value = company;

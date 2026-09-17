@@ -22,6 +22,7 @@ import {
   themeMode,
   themeColor,
   currentCompany,
+  currentCompanySlug,
   currentStoreCustomization,
   fetchStoreCustomization,
   type Product,
@@ -211,7 +212,11 @@ const handleRemoveItem = (productId: number) => {
 // Ir para a página de carrinho / finalizar compra
 const goToCart = () => {
   showCartDialog.value = false
-  router.push('/carrinho')
+  if (currentCompanySlug.value) {
+    router.push(`/${currentCompanySlug.value}/carrinho`)
+  } else {
+    router.push('/carrinho')
+  }
 }
 
 // Abrir detalhes do produto
@@ -279,13 +284,13 @@ const addAndCloseQuickView = (product: Product) => {
         >
           <div 
             v-if="currentStoreCustomization.bannerShowBadge"
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-xs"
             :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
               ? 'bg-primary/15 border-primary/30 text-primary' 
-              : 'bg-primary/5 border-primary/20 text-primary'"
+              : 'bg-primary/10 border-primary/25 text-primary'"
           >
-            <Sparkles class="w-3.5 h-3.5" />
-            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Aberta hoje' }}
           </div>
           
           <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
@@ -296,13 +301,31 @@ const addAndCloseQuickView = (product: Product) => {
             {{ currentCompany?.name }}
           </h1>
           
-          <p class="text-sm md:text-base leading-relaxed"
+          <p class="text-base sm:text-lg md:text-xl font-normal leading-relaxed transition-colors"
             :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
               ? 'text-slate-200' 
-              : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+              : (themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700')"
           >
             {{ currentCompany?.description }}
           </p>
+
+          <!-- Destaques informativos que enriquecem o banner e eliminam o vazio -->
+          <div class="flex flex-wrap items-center gap-2.5 pt-1"
+            :class="currentStoreCustomization.bannerAlignment === 'left' ? 'justify-start' : currentStoreCustomization.bannerAlignment === 'right' ? 'justify-end' : 'justify-center'"
+          >
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+              :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+            >
+              <ShoppingBag class="w-3.5 h-3.5 text-primary" />
+              <span>{{ products.length }} {{ products.length === 1 ? 'produto no catálogo' : 'produtos no catálogo' }}</span>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+              :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+            >
+              <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+              <span>Preparo e produção artesanal</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -314,13 +337,13 @@ const addAndCloseQuickView = (product: Product) => {
       >
         <div 
           v-if="currentStoreCustomization.bannerShowBadge"
-          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+          class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-xs"
           :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
             ? 'bg-primary/15 border-primary/30 text-primary' 
-            : 'bg-primary/5 border-primary/20 text-primary'"
+            : 'bg-primary/10 border-primary/25 text-primary'"
         >
-          <Sparkles class="w-3.5 h-3.5" />
-          {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Aberta hoje' }}
         </div>
         
         <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
@@ -331,13 +354,31 @@ const addAndCloseQuickView = (product: Product) => {
           {{ currentCompany?.name }}
         </h1>
         
-        <p class="text-sm md:text-base leading-relaxed"
+        <p class="text-base sm:text-lg md:text-xl font-normal leading-relaxed transition-colors"
           :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
             ? 'text-slate-200' 
-            : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+            : (themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700')"
         >
           {{ currentCompany?.description }}
         </p>
+
+        <!-- Destaques informativos que enriquecem o banner e eliminam o vazio -->
+        <div class="flex flex-wrap items-center gap-2.5 pt-1"
+          :class="currentStoreCustomization.bannerAlignment === 'center' ? 'justify-center' : currentStoreCustomization.bannerAlignment === 'right' ? 'justify-end' : 'justify-start'"
+        >
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+            :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+          >
+            <ShoppingBag class="w-3.5 h-3.5 text-primary" />
+            <span>{{ products.length }} {{ products.length === 1 ? 'produto no catálogo' : 'produtos no catálogo' }}</span>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+            :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+          >
+            <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+            <span>Preparo e produção artesanal</span>
+          </div>
+        </div>
       </div>
 
       <!-- Disposição 3: Em Grade (Logo na Direita ou Esquerda) -->
@@ -355,13 +396,13 @@ const addAndCloseQuickView = (product: Product) => {
         >
           <div 
             v-if="currentStoreCustomization.bannerShowBadge"
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
+            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border shadow-xs"
             :class="themeMode === 'dark' || (currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage) 
               ? 'bg-primary/15 border-primary/30 text-primary' 
-              : 'bg-primary/5 border-primary/20 text-primary'"
+              : 'bg-primary/10 border-primary/25 text-primary'"
           >
-            <Sparkles class="w-3.5 h-3.5" />
-            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Catálogo Oficial' }}
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            {{ currentStoreCustomization.bannerBadgeText || currentCompany?.name || 'Aberta hoje' }}
           </div>
           
           <h1 class="text-3xl md:text-5xl font-black tracking-tight leading-tight transition-colors"
@@ -372,13 +413,31 @@ const addAndCloseQuickView = (product: Product) => {
             {{ currentCompany?.name }}
           </h1>
           
-          <p class="text-sm md:text-base leading-relaxed"
+          <p class="text-base sm:text-lg md:text-xl font-normal leading-relaxed transition-colors max-w-2xl"
             :class="currentStoreCustomization.bannerStyle === 'cover' && currentStoreCustomization.bannerCoverImage 
               ? 'text-slate-200' 
-              : (themeMode === 'dark' ? 'text-slate-400' : 'text-slate-650')"
+              : (themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700')"
           >
             {{ currentCompany?.description }}
           </p>
+
+          <!-- Destaques informativos que enriquecem o banner e eliminam o vazio -->
+          <div class="flex flex-wrap items-center gap-2.5 pt-1"
+            :class="currentStoreCustomization.bannerAlignment === 'center' ? 'justify-center' : currentStoreCustomization.bannerAlignment === 'right' ? 'justify-end' : 'justify-start'"
+          >
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+              :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+            >
+              <ShoppingBag class="w-3.5 h-3.5 text-primary" />
+              <span>{{ products.length }} {{ products.length === 1 ? 'produto no catálogo' : 'produtos no catálogo' }}</span>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border backdrop-blur-sm shadow-xs"
+              :class="themeMode === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200 text-slate-700'"
+            >
+              <Sparkles class="w-3.5 h-3.5 text-amber-500" />
+              <span>Preparo e produção artesanal</span>
+            </div>
+          </div>
         </div>
 
         <!-- Coluna Logo Integrado -->
@@ -503,8 +562,6 @@ const addAndCloseQuickView = (product: Product) => {
             </span>
           </div>
         </div>
-
-        <!-- Conteúdo do Produto -->
         <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
           <div class="space-y-2">
             <h3 class="font-bold transition-colors duration-200 line-clamp-1 text-sm md:text-base"
@@ -512,21 +569,21 @@ const addAndCloseQuickView = (product: Product) => {
             >
               {{ product.name }}
             </h3>
-            <p class="text-xs line-clamp-2 leading-relaxed"
-              :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+            <p class="text-sm font-normal leading-relaxed line-clamp-2 md:line-clamp-3 min-h-[2.6rem]"
+              :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-600'"
             >
               {{ product.description }}
             </p>
           </div>
 
           <!-- Rodapé do Card com Preço e Botão Compra -->
-          <div class="flex items-center justify-between pt-2 border-t"
-            :class="themeMode === 'dark' ? 'border-slate-900' : 'border-slate-100'"
+          <div class="flex items-center justify-between pt-3 border-t"
+            :class="themeMode === 'dark' ? 'border-slate-800/80' : 'border-slate-100'"
           >
             <div class="flex flex-col">
-              <span class="text-[10px] text-slate-500 font-bold uppercase">Preço à vista</span>
-              <span class="font-extrabold text-base"
-                :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-900'"
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Preço à vista</span>
+              <span class="font-black text-lg md:text-xl tracking-tight"
+                :class="themeMode === 'dark' ? 'text-slate-100' : 'text-slate-900'"
               >
                 {{ formatPrice(product.price) }}
               </span>
@@ -534,23 +591,23 @@ const addAndCloseQuickView = (product: Product) => {
             
             <Button 
               size="sm"
-              class="rounded-xl font-bold transition-all duration-300 gap-1.5 border"
+              class="rounded-xl font-bold text-xs md:text-sm px-3.5 py-2 transition-all duration-300 gap-1.5 border shadow-xs"
               :class="[
                 addedProductId === product.id 
-                  ? 'bg-emerald-650 hover:bg-emerald-650 border-emerald-500 text-white' 
+                  ? 'bg-emerald-600 hover:bg-emerald-600 border-emerald-500 text-white' 
                   : (themeMode === 'dark' 
-                    ? 'bg-slate-950 hover:bg-primary hover:text-primary-foreground border-slate-800 hover:border-primary text-slate-300' 
-                    : 'bg-white hover:bg-primary hover:text-primary-foreground border-slate-205 hover:border-primary text-slate-700')
+                    ? 'bg-slate-950 hover:bg-primary hover:text-primary-foreground border-slate-800 hover:border-primary text-slate-200' 
+                    : 'bg-white hover:bg-primary hover:text-primary-foreground border-slate-200 hover:border-primary text-slate-800')
               ]"
               :disabled="product.stock === 0"
               @click="handleAddToCart(product, $event)"
             >
               <template v-if="addedProductId === product.id">
-                <Check class="w-3.5 h-3.5" />
+                <Check class="w-4 h-4" />
                 <span>Salvo!</span>
               </template>
               <template v-else>
-                <ShoppingBag class="w-3.5 h-3.5" />
+                <ShoppingBag class="w-4 h-4" />
                 <span>Comprar</span>
               </template>
             </Button>
@@ -598,11 +655,11 @@ const addAndCloseQuickView = (product: Product) => {
 
               <!-- Estoque Status -->
               <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full" 
+                <span class="w-2.5 h-2.5 rounded-full" 
                   :class="selectedProduct.stock > 5 ? 'bg-emerald-500' : selectedProduct.stock > 0 ? 'bg-amber-500' : 'bg-red-500'"
                 ></span>
-                <span class="text-xs font-medium"
-                  :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+                <span class="text-xs md:text-sm font-medium"
+                  :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-600'"
                 >
                   {{ selectedProduct.stock > 0 
                     ? `Estoque disponível: ${selectedProduct.stock} unidades` 
@@ -615,8 +672,8 @@ const addAndCloseQuickView = (product: Product) => {
                 :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-150'"
               >
                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Descrição do Produto</h4>
-                <p class="text-xs leading-relaxed"
-                  :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'"
+                <p class="text-sm md:text-base leading-relaxed"
+                  :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700'"
                 >
                   {{ selectedProduct.description }}
                 </p>
@@ -654,44 +711,44 @@ const addAndCloseQuickView = (product: Product) => {
 
     <!-- Modal Carrinho de Compras (Cart Dialog) -->
     <Dialog v-model:open="showCartDialog">
-      <DialogContent class="sm:max-w-[500px] rounded-3xl p-6 overflow-hidden shadow-2xl transition-colors duration-300"
+      <DialogContent class="sm:max-w-[520px] rounded-3xl p-6 overflow-hidden shadow-2xl transition-colors duration-300"
         :class="themeMode === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'"
       >
         <DialogHeader class="border-b pb-4 mb-4" :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'">
-          <DialogTitle class="text-lg font-extrabold flex items-center gap-2">
+          <DialogTitle class="text-xl font-extrabold flex items-center gap-2.5">
             <ShoppingBag class="w-5 h-5 text-primary" />
             Carrinho de Compras
           </DialogTitle>
-          <DialogDescription class="text-xs" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-550'">
+          <DialogDescription class="text-sm" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'">
             Você tem {{ cartCount }} {{ cartCount === 1 ? 'item' : 'itens' }} no seu carrinho.
           </DialogDescription>
         </DialogHeader>
 
         <!-- Lista de itens do carrinho -->
-        <div class="max-h-[300px] overflow-y-auto space-y-4 pr-1 scrollbar-thin"
+        <div class="max-h-[320px] overflow-y-auto space-y-4 pr-1 scrollbar-thin"
           :class="themeMode === 'dark' ? 'scrollbar-thumb-slate-800' : 'scrollbar-thumb-slate-200'"
         >
-          <div v-if="cartItems.length === 0" class="text-center py-8 text-slate-500 text-sm">
+          <div v-if="cartItems.length === 0" class="text-center py-8 text-slate-500 text-base">
             Seu carrinho está vazio.
           </div>
           <div v-else
             v-for="item in cartItems"
             :key="item.product.id"
-            class="flex items-center justify-between gap-4 py-2 border-b"
+            class="flex items-center justify-between gap-4 py-2.5 border-b"
             :class="themeMode === 'dark' ? 'border-slate-800/60' : 'border-slate-100'"
           >
             <!-- Detalhes do item -->
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-12 h-12 rounded-xl bg-slate-950 overflow-hidden border shrink-0"
+            <div class="flex items-center gap-3.5 min-w-0">
+              <div class="w-14 h-14 rounded-xl bg-slate-950 overflow-hidden border shrink-0"
                 :class="themeMode === 'dark' ? 'border-slate-850' : 'border-slate-100'"
               >
                 <img :src="item.product.image_data" :alt="item.product.name" class="w-full h-full object-cover" />
               </div>
               <div class="min-w-0">
-                <h4 class="font-bold text-xs truncate" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
+                <h4 class="font-bold text-sm md:text-base truncate" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
                   {{ item.product.name }}
                 </h4>
-                <p class="text-[10px] font-semibold text-primary mt-0.5">
+                <p class="text-xs md:text-sm font-bold text-primary mt-0.5">
                   {{ formatPrice(item.product.price) }}
                 </p>
               </div>
@@ -699,33 +756,33 @@ const addAndCloseQuickView = (product: Product) => {
 
             <!-- Controles de Quantidade e Exclusão -->
             <div class="flex items-center gap-3 shrink-0">
-              <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5"
+              <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl p-1"
                 :class="themeMode === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'"
               >
                 <button 
-                  class="h-5 w-5 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-xs"
+                  class="h-7 w-7 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-sm font-bold"
                   :class="themeMode === 'dark' ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-200 hover:text-slate-800'"
                   @click="updateQuantity(item, -1)"
                 >
-                  <Minus class="w-3 h-3" />
+                  <Minus class="w-3.5 h-3.5" />
                 </button>
-                <span class="w-4 text-center text-[10px] font-bold" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
+                <span class="w-5 text-center text-xs md:text-sm font-bold" :class="themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'">
                   {{ item.quantity }}
                 </span>
                 <button 
-                  class="h-5 w-5 rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-xs"
+                  class="h-7 w-7 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-850 flex items-center justify-center text-sm font-bold"
                   :class="themeMode === 'dark' ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-200 hover:text-slate-800'"
                   @click="updateQuantity(item, 1)"
                 >
-                  <Plus class="w-3 h-3" />
+                  <Plus class="w-3.5 h-3.5" />
                 </button>
               </div>
               
               <button 
-                class="text-slate-400 hover:text-red-550 p-1"
+                class="text-slate-400 hover:text-red-500 p-1.5 transition-colors"
                 @click="handleRemoveItem(item.product.id!)"
               >
-                <Trash2 class="w-3.5 h-3.5" />
+                <Trash2 class="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -733,9 +790,9 @@ const addAndCloseQuickView = (product: Product) => {
 
         <!-- Subtotal -->
         <div class="border-t pt-4 mt-4 space-y-3" :class="themeMode === 'dark' ? 'border-slate-800' : 'border-slate-100'">
-          <div class="flex justify-between items-baseline text-sm">
-            <span class="font-bold" :class="themeMode === 'dark' ? 'text-slate-400' : 'text-slate-550'">Subtotal</span>
-            <span class="font-extrabold text-base text-primary">
+          <div class="flex justify-between items-baseline">
+            <span class="font-bold text-base" :class="themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'">Subtotal</span>
+            <span class="font-black text-xl md:text-2xl text-primary">
               {{ formatPrice(subtotal) }}
             </span>
           </div>
@@ -744,7 +801,7 @@ const addAndCloseQuickView = (product: Product) => {
           <div class="flex items-center gap-3 pt-2">
             <Button 
               variant="outline" 
-              class="rounded-xl font-bold flex-1 border shadow-sm transition-all duration-200"
+              class="rounded-xl font-bold text-sm md:text-base py-2.5 flex-1 border shadow-sm transition-all duration-200"
               :class="themeMode === 'dark' 
                 ? 'bg-slate-950 border-slate-800 hover:bg-slate-800 text-slate-300' 
                 : 'bg-white border-slate-205 hover:bg-slate-100 text-slate-700'"
@@ -753,7 +810,7 @@ const addAndCloseQuickView = (product: Product) => {
               Continuar Comprando
             </Button>
             <Button 
-              class="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold flex-1 shadow-lg shadow-primary/20"
+              class="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm md:text-base py-2.5 flex-1 shadow-lg shadow-primary/20"
               @click="goToCart"
             >
               Finalizar Compra

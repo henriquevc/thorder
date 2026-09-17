@@ -97,10 +97,24 @@ const router = createRouter({
 });
 
 // Guard de navegação para resolver empresa (caminho ou subdomínio) e proteger rotas
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to, from, next) => {
   // 1. Identifica a empresa pelo path param se houver
   const pathSlug = to.params.companySlug ? String(to.params.companySlug).toLowerCase() : null;
   const hostnameSlug = getCompanySlugFromHostname();
+
+  // Intercepta rotas de cliente acessadas sem prefixo de empresa (ex: /carrinho, /checkout, /pedido-confirmado/:id)
+  // quando já existe uma loja ativa, redirecionando para a rota canônica da loja
+  const isClientDirectRoute = (to.name === 'cart' || to.name === 'checkout' || to.name === 'order-success') && !pathSlug && !hostnameSlug;
+  if (isClientDirectRoute) {
+    const storedSlug = typeof window !== 'undefined' ? sessionStorage.getItem('thorder_active_store_slug') : null;
+    const fallbackSlug = currentCompanySlug.value || (from.params.companySlug ? String(from.params.companySlug).toLowerCase() : null) || storedSlug;
+    if (fallbackSlug) {
+      const cleanPath = to.path.startsWith('/') ? to.path.substring(1) : to.path;
+      next({ path: `/${fallbackSlug}/${cleanPath}` });
+      return;
+    }
+  }
+
   const slug = pathSlug || hostnameSlug;
 
   if (slug) {
